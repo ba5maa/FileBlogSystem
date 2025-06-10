@@ -245,6 +245,96 @@ app.MapGet("/api/admin/info", (ClaimsPrincipal user) =>
 .Produces(StatusCodes.Status401Unauthorized) // Not authenticated
 .Produces(StatusCodes.Status403Forbidden); // Authenticated but not authorized (wrong role)
 
+// ---Create Blog Post ---
+app.MapPost("/api/posts", async (CreateBlogPostRequest request, IContentService contentService, ClaimsPrincipal user) =>
+{
+    if (!user.IsInRole("Admin") && !user.IsInRole("Author"))
+    {
+        return Results.Forbid(); // Returns 403 Forbidden
+    }
+
+    if (string.IsNullOrEmpty(request.Title) || string.IsNullOrEmpty(request.Content))
+    {
+        return Results.BadRequest("Title and Content are required.");
+    }
+
+    var newPostMeta = await contentService.CreateBlogPostAsync(request);
+
+    if (newPostMeta == null)
+    {
+        return Results.StatusCode(StatusCodes.Status500InternalServerError);
+    }
+
+    return Results.CreatedAtRoute("GetPostBySlug", new { slug = newPostMeta.Slug }, newPostMeta);
+})
+.RequireAuthorization() 
+.WithName("CreateBlogPost")
+.Produces<BlogPostMeta>(StatusCodes.Status201Created) 
+.Produces(StatusCodes.Status400BadRequest)            
+.Produces(StatusCodes.Status401Unauthorized)         
+.Produces(StatusCodes.Status403Forbidden)  
+.Produces(StatusCodes.Status500InternalServerError)  
+.Accepts<CreateBlogPostRequest>("application/json"); 
+
+// --- Update Blog Post ---
+app.MapPut("/api/posts/{slug}", async (string slug, UpdateBlogPostRequest request, IContentService contentService, ClaimsPrincipal user) =>
+{
+    //only "Admin" or "Author" roles can update posts
+    if (!user.IsInRole("Admin") && !user.IsInRole("Author"))
+    {
+        return Results.Forbid(); 
+    }
+
+    if (string.IsNullOrEmpty(request.Title) || string.IsNullOrEmpty(request.Content))
+    {
+        return Results.BadRequest("Title and Content are required for update.");
+    }
+
+    var updatedPostMeta = await contentService.UpdateBlogPostAsync(slug, request);
+
+    if (updatedPostMeta == null)
+    {
+        
+        return Results.NotFound($"Blog post with slug '{slug}' not found or could not be updated.");
+    }
+
+    return Results.Ok(updatedPostMeta); 
+})
+.RequireAuthorization()
+.WithName("UpdateBlogPost")
+.Produces<BlogPostMeta>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)     
+.Produces(StatusCodes.Status401Unauthorized)  
+.Produces(StatusCodes.Status403Forbidden)  
+.Produces(StatusCodes.Status404NotFound) 
+.Produces(StatusCodes.Status500InternalServerError)
+.Accepts<UpdateBlogPostRequest>("application/json"); 
+
+// --- DELETE Blog Post --- 
+app.MapDelete("/api/posts/{slug}", async (string slug, IContentService contentService, ClaimsPrincipal user) =>
+{
+    if (!user.IsInRole("Admin"))
+    {
+        return Results.Forbid();
+    }
+
+    var deleted = await contentService.DeleteBlogPostAsync(slug);
+
+    if (!deleted)
+    {
+        return Results.NotFound($"Blog post with slug '{slug}' not found or could not be deleted.");
+    }
+
+    return Results.NoContent(); 
+})
+.RequireAuthorization() 
+.WithName("DeleteBlogPost")
+.Produces(StatusCodes.Status204NoContent) 
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status403Forbidden) 
+.Produces(StatusCodes.Status404NotFound) 
+.Produces(StatusCodes.Status500InternalServerError);
+
 
 // --- End API Endpoints ---
 

@@ -1,5 +1,4 @@
-using FileBlogSystem.Models; // Use the correct namespace
-
+using FileBlogSystem.Models; 
 namespace FileBlogSystem.Services
 {
     public interface IContentService
@@ -10,5 +9,8 @@ namespace FileBlogSystem.Services
         Task<List<Category>> GetAllCategoriesAsync();
         Task<List<Tag>> GetAllTagsAsync();
         Task<User?> GetUserByUsernameAsync(string username);
+        Task<BlogPostMeta?> CreateBlogPostAsync(CreateBlogPostRequest request);
+         Task<BlogPostMeta?> UpdateBlogPostAsync(string originalSlug, UpdateBlogPostRequest request);
+        Task<bool> DeleteBlogPostAsync(string slug);
     }
 }

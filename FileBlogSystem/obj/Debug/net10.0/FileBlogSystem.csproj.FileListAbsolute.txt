@@ -1,6 +1,4 @@
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\content\Categories\general.json
-C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\content\Posts\2025-06-10-your-first-post\content.md
-C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\content\Posts\2025-06-10-your-first-post\meta.json
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\content\Tags\tutorial.json
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\content\Users\Admin\profile.json
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\config\routes.json
@@ -43,3 +41,6 @@ C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Microsoft.IdentityModel.Tokens.dll
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\System.IdentityModel.Tokens.Jwt.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\content\Posts\2025-06-10-my-second-awesome-post\content.md
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\content\Posts\2025-06-10-my-second-awesome-post\meta.json
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\content\Posts\2025-06-10-my-updated-blog-post-slug\meta.json

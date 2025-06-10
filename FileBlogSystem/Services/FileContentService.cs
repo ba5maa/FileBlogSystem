@@ -1,6 +1,7 @@
 using FileBlogSystem.Models; 
-using Microsoft.Extensions.Logging; 
+using Microsoft.Extensions.Logging;
 using System.Text.Json; 
+using System.Text.RegularExpressions;
 
 namespace FileBlogSystem.Services
 {
@@ -145,6 +146,175 @@ namespace FileBlogSystem.Services
         {
             var userProfilePath = Path.Combine(_contentRootPath, "users", username, "profile.json");
             return await ReadJsonFileAsync<User>(userProfilePath);
+        }
+
+        // --- New Write Method for Blog Posts ---
+        public async Task<BlogPostMeta?> CreateBlogPostAsync(CreateBlogPostRequest request)
+        {
+            try
+            {
+                var baseSlug = !string.IsNullOrEmpty(request.CustomUrl)
+                               ? GenerateSlug(request.CustomUrl)
+                               : GenerateSlug(request.Title);
+
+                var datePrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
+                var postFolderName = $"{datePrefix}-{baseSlug}";
+                var postFolderPath = Path.Combine(_contentRootPath, "posts", postFolderName);
+
+                if (Directory.Exists(postFolderPath))
+                {
+                    // Handle potential rare conflict, e.g., by appending a timestamp or GUID
+                    postFolderName = $"{datePrefix}-{baseSlug}-{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+                    postFolderPath = Path.Combine(_contentRootPath, "posts", postFolderName);
+                }
+
+
+                // create the post directory
+                Directory.CreateDirectory(postFolderPath);
+
+                // prepare BlogPostMeta for saving
+                var now = DateTime.UtcNow;
+                var newPostMeta = new BlogPostMeta
+                {
+                    Title = request.Title,
+                    Description = request.Description,
+                    PublishedDate = now,
+                    ModificationDate = now,
+                    Tags = request.Tags ?? new List<string>(), // handle potential null
+                    Categories = request.Categories ?? new List<string>(),
+                    CustomUrl = request.CustomUrl,
+                    Slug = baseSlug, // store the generated slug here
+                    PostFolderPath = postFolderPath // store the path for internal use
+                };
+
+                // save meta.json
+                var metaFilePath = Path.Combine(postFolderPath, "meta.json");
+                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+                var metaJson = JsonSerializer.Serialize(newPostMeta, jsonOptions);
+                await File.WriteAllTextAsync(metaFilePath, metaJson);
+
+                // save content.md
+                var contentFilePath = Path.Combine(postFolderPath, "content.md");
+                await File.WriteAllTextAsync(contentFilePath, request.Content);
+
+                _logger.LogInformation($"Successfully created new blog post: {newPostMeta.Title} at {postFolderPath}");
+
+                return newPostMeta;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating blog post.");
+                return null;
+            }
+        }
+
+        // --- Helper method for slug generation ---
+        private string GenerateSlug(string title)
+        {
+            var slug = title.ToLowerInvariant();
+            slug = Regex.Replace(slug, @"[^a-z0-9\s-]", ""); // Remove invalid chars
+            slug = Regex.Replace(slug, @"\s+", "-").Trim(); // Convert spaces to hyphens
+            slug = Regex.Replace(slug, @"-+", "-");        // Collapse multiple hyphens
+            return slug;
+        }
+        
+        // --- New Write Method for Update ---
+        public async Task<BlogPostMeta?> UpdateBlogPostAsync(string originalSlug, UpdateBlogPostRequest request)
+        {
+            var existingPostMeta = await GetBlogPostMetaBySlugAsync(originalSlug);
+            if (existingPostMeta == null || string.IsNullOrEmpty(existingPostMeta.PostFolderPath))
+            {
+                _logger.LogWarning($"Attempted to update non-existent or pathless post with slug: {originalSlug}");
+                return null; // Post not found
+            }
+
+            var newBaseSlug = !string.IsNullOrEmpty(request.CustomUrl)
+                              ? GenerateSlug(request.CustomUrl)
+                              : GenerateSlug(request.Title);
+
+            var originalFolderName = Path.GetFileName(existingPostMeta.PostFolderPath);
+            string datePrefix = "";
+
+            if (originalFolderName.Length >= 10 && originalFolderName[4] == '-' && originalFolderName[7] == '-' && originalFolderName[10] == '-')
+            {
+                datePrefix = originalFolderName.Substring(0, 10);
+            } else {
+                 datePrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            }
+
+
+            var newPostFolderName = $"{datePrefix}-{newBaseSlug}";
+            var newPostFolderPath = Path.Combine(_contentRootPath, "posts", newPostFolderName);
+
+            if (existingPostMeta.PostFolderPath != newPostFolderPath)
+            {
+                try
+                {
+                    if (Directory.Exists(newPostFolderPath))
+                    {
+                        _logger.LogError($"Target folder '{newPostFolderPath}' already exists for renaming. Cannot rename post '{originalSlug}'.");
+                        return null;
+                    }
+                    Directory.Move(existingPostMeta.PostFolderPath, newPostFolderPath);
+                    _logger.LogInformation($"Renamed post folder from '{existingPostMeta.PostFolderPath}' to '{newPostFolderPath}' for slug '{originalSlug}'.");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error renaming post folder from '{existingPostMeta.PostFolderPath}' to '{newPostFolderPath}' for slug '{originalSlug}'.");
+                    return null; 
+                }
+            }
+
+            existingPostMeta.Title = request.Title;
+            existingPostMeta.Description = request.Description;
+            existingPostMeta.ModificationDate = DateTime.UtcNow; 
+            existingPostMeta.Tags = request.Tags ?? new List<string>();
+            existingPostMeta.Categories = request.Categories ?? new List<string>();
+            existingPostMeta.CustomUrl = request.CustomUrl;
+            existingPostMeta.Slug = newBaseSlug; 
+            existingPostMeta.PostFolderPath = newPostFolderPath; 
+
+            try
+            {
+                var metaFilePath = Path.Combine(newPostFolderPath, "meta.json");
+                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+                var updatedMetaJson = JsonSerializer.Serialize(existingPostMeta, jsonOptions);
+                await File.WriteAllTextAsync(metaFilePath, updatedMetaJson);
+
+                var contentFilePath = Path.Combine(newPostFolderPath, "content.md");
+                await File.WriteAllTextAsync(contentFilePath, request.Content); // Save the updated content
+
+                _logger.LogInformation($"Successfully updated blog post: {existingPostMeta.Title} (New Slug: {existingPostMeta.Slug})");
+                return existingPostMeta;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error saving updated blog post with slug: {originalSlug}.");
+                return null;
+            }
+        }
+
+        // --- New Write Method for Delete ---
+        public async Task<bool> DeleteBlogPostAsync(string slug)
+        {
+            var postMeta = await GetBlogPostMetaBySlugAsync(slug);
+            if (postMeta == null || string.IsNullOrEmpty(postMeta.PostFolderPath))
+            {
+                _logger.LogWarning($"Attempted to delete non-existent or pathless post with slug: {slug}");
+                return false; 
+            }
+
+            try
+            {
+                Directory.Delete(postMeta.PostFolderPath, recursive: true);
+                _logger.LogInformation($"Successfully deleted blog post folder: {postMeta.PostFolderPath}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting blog post with slug: {slug} at path: {postMeta.PostFolderPath}");
+                return false;
+            }
         }
     }
 }
