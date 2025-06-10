@@ -34,3 +34,12 @@ C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\obj\Debug\net10.0\FileBlogSystem.csproj.AssemblyReference.cache
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\obj\Debug\net10.0\FileBlogSystem.MvcApplicationPartsAssemblyInfo.cs
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\obj\Debug\net10.0\FileBlog.F2444F19.Up2Date
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\BCrypt.Net-Next.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Microsoft.IdentityModel.Abstractions.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Microsoft.IdentityModel.JsonWebTokens.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Microsoft.IdentityModel.Logging.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Microsoft.IdentityModel.Protocols.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Microsoft.IdentityModel.Tokens.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\System.IdentityModel.Tokens.Jwt.dll
