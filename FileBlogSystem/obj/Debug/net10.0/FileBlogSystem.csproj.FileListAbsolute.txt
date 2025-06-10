@@ -1,4 +1,3 @@
-C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\content\Categories\category-name.json
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\content\Categories\general.json
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\content\Posts\2025-06-10-your-first-post\content.md
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\content\Posts\2025-06-10-your-first-post\meta.json
@@ -28,3 +27,10 @@ C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\obj
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\obj\Debug\net10.0\FileBlogSystem.pdb
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\obj\Debug\net10.0\FileBlogSystem.genruntimeconfig.cache
 C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\obj\Debug\net10.0\ref\FileBlogSystem.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Microsoft.OpenApi.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Swashbuckle.AspNetCore.Swagger.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\obj\Debug\net10.0\FileBlogSystem.csproj.AssemblyReference.cache
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\obj\Debug\net10.0\FileBlogSystem.MvcApplicationPartsAssemblyInfo.cs
+C:\Users\Basma\OneDrive\Desktop\SK\Assignment1\FileBlogSystem\FileBlogSystem\obj\Debug\net10.0\FileBlog.F2444F19.Up2Date
