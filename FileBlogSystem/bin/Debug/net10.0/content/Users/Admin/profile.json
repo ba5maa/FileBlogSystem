@@ -1,0 +1,5 @@
+{
+  "Username": "admin",
+  "Email": "admin@example.com",
+  "Roles": ["Admin", "Author"]
+}

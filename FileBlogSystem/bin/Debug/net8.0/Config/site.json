@@ -1,0 +1,6 @@
+{
+  "Title": "My File Blog",
+  "Description": "A file based blog system",
+  "BaseUrl": "https://localhost:5001",
+  "PostsPerPage": 10
+}

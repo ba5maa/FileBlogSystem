@@ -1,0 +1,19 @@
+{
+  "Version": 1,
+  "Hash": "w6i3lb+j7UaqJtXe+rjiXUUkQjBGNkEdnmNVKBZwxGI=",
+  "Source": "FileBlogSystem",
+  "BasePath": "_content/FileBlogSystem",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "FileBlogSystem\\wwwroot",
+      "Source": "FileBlogSystem",
+      "ContentRoot": "C:\\Users\\Basma\\OneDrive\\Desktop\\SK\\Assignment1\\FileBlogSystem\\FileBlogSystem\\wwwroot\\",
+      "BasePath": "_content/FileBlogSystem",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": []
+}

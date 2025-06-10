@@ -1,0 +1,5 @@
+{
+  "SiteName": "My File Blog",
+  "Description": "A lightweight, file-based blog system.",
+  "PostsPerPage": 5
+}
