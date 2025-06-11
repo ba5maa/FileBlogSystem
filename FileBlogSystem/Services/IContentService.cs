@@ -10,7 +10,14 @@ namespace FileBlogSystem.Services
         Task<List<Tag>> GetAllTagsAsync();
         Task<User?> GetUserByUsernameAsync(string username);
         Task<BlogPostMeta?> CreateBlogPostAsync(CreateBlogPostRequest request);
-         Task<BlogPostMeta?> UpdateBlogPostAsync(string originalSlug, UpdateBlogPostRequest request);
+        Task<BlogPostMeta?> UpdateBlogPostAsync(string originalSlug, UpdateBlogPostRequest request);
         Task<bool> DeleteBlogPostAsync(string slug);
+        Task<Category?> CreateCategoryAsync(CreateCategoryRequest request);
+        Task<Category?> UpdateCategoryAsync(string oldName, UpdateCategoryRequest request);
+        Task<bool> DeleteCategoryAsync(string name);
+        Task<Tag?> CreateTagAsync(CreateTagRequest request);
+        Task<Tag?> UpdateTagAsync(string oldName, UpdateTagRequest request);
+        Task<bool> DeleteTagAsync(string name);
+
     }
 }

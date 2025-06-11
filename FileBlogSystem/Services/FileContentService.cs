@@ -1,7 +1,9 @@
 using FileBlogSystem.Models; 
 using Microsoft.Extensions.Logging;
-using System.Text.Json; 
+using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.IO;
+using System.Linq; 
 
 namespace FileBlogSystem.Services
 {
@@ -9,12 +11,21 @@ namespace FileBlogSystem.Services
     {
         private readonly string _contentRootPath;
         private readonly ILogger<FileContentService> _logger;
+        private readonly string _postsFolderPath;
+        private readonly string _categoriesFolderPath;
+        private readonly string _tagsFolderPath;
 
         public FileContentService(IWebHostEnvironment env, ILogger<FileContentService> logger)
         {
             // env.ContentRootPath points to where .csproj is
             _contentRootPath = Path.Combine(env.ContentRootPath, "content");
             _logger = logger;
+            _postsFolderPath = Path.Combine(_contentRootPath, "posts");
+            _categoriesFolderPath = Path.Combine(_contentRootPath, "categories");
+            _tagsFolderPath = Path.Combine(_contentRootPath, "tags");
+            Directory.CreateDirectory(_postsFolderPath);
+            Directory.CreateDirectory(_categoriesFolderPath);
+            Directory.CreateDirectory(_tagsFolderPath);
         }
 
         private async Task<T?> ReadJsonFileAsync<T>(string filePath) where T : class
@@ -99,21 +110,28 @@ namespace FileBlogSystem.Services
         public async Task<List<Category>> GetAllCategoriesAsync()
         {
             var categories = new List<Category>();
-            var categoriesDirectory = Path.Combine(_contentRootPath, "categories");
-
-            if (!Directory.Exists(categoriesDirectory))
+            try
             {
-                _logger.LogWarning($"Categories directory not found: {categoriesDirectory}");
-                return categories;
-            }
-
-            foreach (var categoryFile in Directory.EnumerateFiles(categoriesDirectory, "*.json"))
-            {
-                var category = await ReadJsonFileAsync<Category>(categoryFile);
-                if (category != null)
+                if (!Directory.Exists(_categoriesFolderPath))
                 {
-                    categories.Add(category);
+                    Directory.CreateDirectory(_categoriesFolderPath);
+                    return categories;
                 }
+
+                var categoryFiles = Directory.EnumerateFiles(_categoriesFolderPath, "*.json", SearchOption.TopDirectoryOnly);
+
+                foreach (var filePath in categoryFiles)
+                {
+                    var category = await ReadJsonFileAsync<Category>(filePath);
+                    if (category != null)
+                    {
+                        categories.Add(category);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error reading categories from {_categoriesFolderPath}.");
             }
             return categories.OrderBy(c => c.Name).ToList();
         }
@@ -122,23 +140,31 @@ namespace FileBlogSystem.Services
         public async Task<List<Tag>> GetAllTagsAsync()
         {
             var tags = new List<Tag>();
-            var tagsDirectory = Path.Combine(_contentRootPath, "tags");
-
-            if (!Directory.Exists(tagsDirectory))
+            try
             {
-                _logger.LogWarning($"Tags directory not found: {tagsDirectory}");
-                return tags;
-            }
-
-            foreach (var tagFile in Directory.EnumerateFiles(tagsDirectory, "*.json"))
-            {
-                var tag = await ReadJsonFileAsync<Tag>(tagFile);
-                if (tag != null)
+                // Ensure the tags folder exists
+                if (!Directory.Exists(_tagsFolderPath))
                 {
-                    tags.Add(tag);
+                    Directory.CreateDirectory(_tagsFolderPath); // Create if it doesn't exist
+                    return tags; // Return empty list if just created
+                }
+
+                var tagFiles = Directory.EnumerateFiles(_tagsFolderPath, "*.json", SearchOption.TopDirectoryOnly);
+
+                foreach (var filePath in tagFiles)
+                {
+                    var tag = await ReadJsonFileAsync<Tag>(filePath);
+                    if (tag != null)
+                    {
+                        tags.Add(tag);
+                    }
                 }
             }
-            return tags.OrderBy(t => t.Name).ToList();
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error reading tags from {_tagsFolderPath}.");
+            }
+            return tags.OrderBy(t => t.Name).ToList(); // Always return sorted
         }
 
         // --- User Methods ---
@@ -217,7 +243,7 @@ namespace FileBlogSystem.Services
             slug = Regex.Replace(slug, @"-+", "-");        // Collapse multiple hyphens
             return slug;
         }
-        
+
         // --- New Write Method for Update ---
         public async Task<BlogPostMeta?> UpdateBlogPostAsync(string originalSlug, UpdateBlogPostRequest request)
         {
@@ -238,8 +264,10 @@ namespace FileBlogSystem.Services
             if (originalFolderName.Length >= 10 && originalFolderName[4] == '-' && originalFolderName[7] == '-' && originalFolderName[10] == '-')
             {
                 datePrefix = originalFolderName.Substring(0, 10);
-            } else {
-                 datePrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            }
+            else
+            {
+                datePrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
             }
 
 
@@ -261,18 +289,18 @@ namespace FileBlogSystem.Services
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, $"Error renaming post folder from '{existingPostMeta.PostFolderPath}' to '{newPostFolderPath}' for slug '{originalSlug}'.");
-                    return null; 
+                    return null;
                 }
             }
 
             existingPostMeta.Title = request.Title;
             existingPostMeta.Description = request.Description;
-            existingPostMeta.ModificationDate = DateTime.UtcNow; 
+            existingPostMeta.ModificationDate = DateTime.UtcNow;
             existingPostMeta.Tags = request.Tags ?? new List<string>();
             existingPostMeta.Categories = request.Categories ?? new List<string>();
             existingPostMeta.CustomUrl = request.CustomUrl;
-            existingPostMeta.Slug = newBaseSlug; 
-            existingPostMeta.PostFolderPath = newPostFolderPath; 
+            existingPostMeta.Slug = newBaseSlug;
+            existingPostMeta.PostFolderPath = newPostFolderPath;
 
             try
             {
@@ -294,14 +322,14 @@ namespace FileBlogSystem.Services
             }
         }
 
-        // --- New Write Method for Delete ---
+        // --- Write Method for Delete Post ---
         public async Task<bool> DeleteBlogPostAsync(string slug)
         {
             var postMeta = await GetBlogPostMetaBySlugAsync(slug);
             if (postMeta == null || string.IsNullOrEmpty(postMeta.PostFolderPath))
             {
                 _logger.LogWarning($"Attempted to delete non-existent or pathless post with slug: {slug}");
-                return false; 
+                return false;
             }
 
             try
@@ -313,6 +341,299 @@ namespace FileBlogSystem.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error deleting blog post with slug: {slug} at path: {postMeta.PostFolderPath}");
+                return false;
+            }
+        }
+
+
+        // --- CRUD Methods for Categories ---
+
+        public async Task<Category?> CreateCategoryAsync(CreateCategoryRequest request)
+        {
+            try
+            {
+                var categoryName = request.Name.Trim();
+                var categorySlug = GenerateSlug(categoryName);
+
+                var categoryFilePath = Path.Combine(_categoriesFolderPath, $"{categorySlug}.json");
+                if (File.Exists(categoryFilePath))
+                {
+                    _logger.LogWarning($"Category '{categoryName}' (slug: {categorySlug}) already exists. Not creating.");
+                    return null;
+                }
+
+                var newCategory = new Category
+                {
+                    Name = categoryName,
+                    Slug = categorySlug,
+                    Description = request.Description
+                };
+
+                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+                var json = JsonSerializer.Serialize(newCategory, jsonOptions);
+                await File.WriteAllTextAsync(categoryFilePath, json);
+
+                _logger.LogInformation($"Successfully created category: {categoryName} (Slug: {categorySlug}) at {categoryFilePath}");
+                return newCategory;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error creating category '{request.Name}'.");
+                return null;
+            }
+        }
+
+        public async Task<Category?> UpdateCategoryAsync(string oldName, UpdateCategoryRequest request)
+        {
+            try
+            {
+                _logger.LogInformation($"Attempting to update category '{oldName}' to '{request.NewName}'.");
+
+                var categories = await GetAllCategoriesAsync();
+                var oldCategory = categories.FirstOrDefault(c => c.Name.Equals(oldName.Trim(), StringComparison.OrdinalIgnoreCase));
+
+                if (oldCategory == null)
+                {
+                    _logger.LogWarning($"Category '{oldName}' not found for update (internal check).");
+                    return null;
+                }
+
+                var originalSlugForFileMove = oldCategory.Slug;
+                var oldCategoryFilePath = Path.Combine(_categoriesFolderPath, $"{originalSlugForFileMove}.json");
+                _logger.LogInformation($"Original category file path: {oldCategoryFilePath}");
+
+                var newName = request.NewName.Trim();
+                var newSlug = GenerateSlug(newName);
+                _logger.LogInformation($"Generated new slug: {newSlug}");
+
+
+                if (!originalSlugForFileMove.Equals(newSlug, StringComparison.OrdinalIgnoreCase) &&
+                    categories.Any(c => c.Slug.Equals(newSlug, StringComparison.OrdinalIgnoreCase) && !c.Slug.Equals(originalSlugForFileMove, StringComparison.OrdinalIgnoreCase)))
+                {
+                    _logger.LogWarning($"New category name '{newName}' (slug: {newSlug}) conflicts with an existing category.");
+                    return null;
+                }
+
+                oldCategory.Name = newName;
+                oldCategory.Slug = newSlug;
+                oldCategory.Description = request.Description;
+
+                string newCategoryFilePath = oldCategoryFilePath;
+
+                if (!originalSlugForFileMove.Equals(newSlug, StringComparison.OrdinalIgnoreCase))
+                {
+                    newCategoryFilePath = Path.Combine(_categoriesFolderPath, $"{newSlug}.json");
+                    _logger.LogInformation($"Slug changed from '{originalSlugForFileMove}' to '{newSlug}'. Attempting to rename file from '{oldCategoryFilePath}' to '{newCategoryFilePath}'.");
+
+                    try
+                    {
+                        if (File.Exists(newCategoryFilePath))
+                        {
+                            _logger.LogError($"Target category file '{newCategoryFilePath}' already exists. Cannot rename category '{oldName}'.");
+                            return null;
+                        }
+                        File.Move(oldCategoryFilePath, newCategoryFilePath);
+                        _logger.LogInformation($"Successfully renamed category file from '{oldCategoryFilePath}' to '{newCategoryFilePath}'.");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"ERROR DURING FILE RENAME! Error renaming category file from '{oldCategoryFilePath}' to '{newCategoryFilePath}'.");
+                        return null;
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation($"Category slug did not change ('{newSlug}'). No file rename needed.");
+                }
+
+                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+                var json = JsonSerializer.Serialize(oldCategory, jsonOptions);
+                await File.WriteAllTextAsync(newCategoryFilePath, json); // Write to the correct (new or old) path
+
+                _logger.LogInformation($"Successfully updated category data for '{newName}' (Slug: {newSlug}). Saved to: {newCategoryFilePath}");
+                return oldCategory;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Catch-all error updating category from '{oldName}' to '{request.NewName}'.");
+                return null;
+            }
+        }
+
+        public async Task<bool> DeleteCategoryAsync(string name)
+        {
+            try
+            {
+                var categories = await GetAllCategoriesAsync();
+                var categoryToDelete = categories.FirstOrDefault(c => c.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase));
+
+                if (categoryToDelete == null)
+                {
+                    _logger.LogWarning($"Category '{name}' not found for deletion.");
+                    return false;
+                }
+
+                var categoryFilePath = Path.Combine(_categoriesFolderPath, $"{categoryToDelete.Slug}.json");
+
+                if (File.Exists(categoryFilePath))
+                {
+                    File.Delete(categoryFilePath);
+                    _logger.LogInformation($"Successfully deleted category file: {categoryFilePath}");
+                    return true;
+                }
+                else
+                {
+                    _logger.LogWarning($"Category file for '{name}' (slug: {categoryToDelete.Slug}) not found at expected path: {categoryFilePath}.");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting category '{name}'.");
+                return false;
+            }
+        }
+
+        // --- CRUD Methods for Tags ---
+        public async Task<Tag?> CreateTagAsync(CreateTagRequest request)
+        {
+            try
+            {
+                var tagName = request.Name.Trim();
+                var tagSlug = GenerateSlug(tagName); // Generate slug from name
+
+                var tagFilePath = Path.Combine(_tagsFolderPath, $"{tagSlug}.json");
+                if (File.Exists(tagFilePath))
+                {
+                    _logger.LogWarning($"Tag '{tagName}' (slug: {tagSlug}) already exists. Not creating.");
+                    return null;
+                }
+
+                var newTag = new Tag
+                {
+                    Name = tagName,
+                    Slug = tagSlug
+                };
+
+                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+                var json = JsonSerializer.Serialize(newTag, jsonOptions);
+                await File.WriteAllTextAsync(tagFilePath, json);
+
+                _logger.LogInformation($"Successfully created tag: {tagName} (Slug: {tagSlug}) at {tagFilePath}");
+                return newTag;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error creating tag '{request.Name}'.");
+                return null;
+            }
+        }
+
+        public async Task<Tag?> UpdateTagAsync(string oldName, UpdateTagRequest request)
+        {
+            try
+            {
+                _logger.LogInformation($"Attempting to update tag '{oldName}' to '{request.NewName}'.");
+
+                var tags = await GetAllTagsAsync(); 
+                var oldTag = tags.FirstOrDefault(t => t.Name.Equals(oldName.Trim(), StringComparison.OrdinalIgnoreCase));
+
+                if (oldTag == null)
+                {
+                    _logger.LogWarning($"Tag '{oldName}' not found for update.");
+                    return null; 
+                }
+
+                var originalSlugForFileMove = oldTag.Slug;
+                var oldTagFilePath = Path.Combine(_tagsFolderPath, $"{originalSlugForFileMove}.json");
+                _logger.LogInformation($"Original tag file path: {oldTagFilePath}");
+
+                var newName = request.NewName.Trim();
+                var newSlug = GenerateSlug(newName);
+                _logger.LogInformation($"Generated new slug: {newSlug}");
+
+                if (!originalSlugForFileMove.Equals(newSlug, StringComparison.OrdinalIgnoreCase) &&
+                    tags.Any(t => t.Slug.Equals(newSlug, StringComparison.OrdinalIgnoreCase) && !t.Slug.Equals(originalSlugForFileMove, StringComparison.OrdinalIgnoreCase)))
+                {
+                    _logger.LogWarning($"New tag name '{newName}' (slug: {newSlug}) conflicts with an existing tag.");
+                    return null; 
+                }
+
+                oldTag.Name = newName;
+                oldTag.Slug = newSlug; 
+
+                string newTagFilePath = oldTagFilePath;
+
+                if (!originalSlugForFileMove.Equals(newSlug, StringComparison.OrdinalIgnoreCase))
+                {
+                    newTagFilePath = Path.Combine(_tagsFolderPath, $"{newSlug}.json");
+                    _logger.LogInformation($"Slug changed from '{originalSlugForFileMove}' to '{newSlug}'. Attempting to rename file from '{oldTagFilePath}' to '{newTagFilePath}'.");
+
+                    try
+                    {
+                        if (File.Exists(newTagFilePath))
+                        {
+                            _logger.LogError($"Target tag file '{newTagFilePath}' already exists. Cannot rename tag '{oldName}'.");
+                            return null;
+                        }
+                        File.Move(oldTagFilePath, newTagFilePath);
+                        _logger.LogInformation($"Successfully renamed tag file from '{oldTagFilePath}' to '{newTagFilePath}'.");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"ERROR DURING FILE RENAME! Error renaming tag file from '{oldTagFilePath}' to '{newTagFilePath}'.");
+                        return null;
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation($"Tag slug did not change ('{newSlug}'). No file rename needed.");
+                }
+
+                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+                var json = JsonSerializer.Serialize(oldTag, jsonOptions);
+                await File.WriteAllTextAsync(newTagFilePath, json);
+
+                _logger.LogInformation($"Successfully updated tag from '{oldName}' to '{newName}' (Slug: {newSlug}).");
+                return oldTag;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating tag from '{oldName}' to '{request.NewName}'.");
+                return null;
+            }
+        }
+
+        public async Task<bool> DeleteTagAsync(string name)
+        {
+            try
+            {
+                var tags = await GetAllTagsAsync(); 
+                var tagToDelete = tags.FirstOrDefault(t => t.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase));
+
+                if (tagToDelete == null)
+                {
+                    _logger.LogWarning($"Tag '{name}' not found for deletion.");
+                    return false; 
+                }
+
+                var tagFilePath = Path.Combine(_tagsFolderPath, $"{tagToDelete.Slug}.json");
+
+                if (File.Exists(tagFilePath))
+                {
+                    File.Delete(tagFilePath);
+                    _logger.LogInformation($"Successfully deleted tag file: {tagFilePath}");
+                    return true;
+                }
+                else
+                {
+                    _logger.LogWarning($"Tag file for '{name}' (slug: {tagToDelete.Slug}) not found at expected path: {tagFilePath}.");
+                    return false; 
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting tag '{name}'.");
                 return false;
             }
         }

@@ -8,6 +8,7 @@ using System.Security.Claims;
 using FileBlogSystem.Security; // for PasswordHasher
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.OpenApi;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -279,7 +280,7 @@ app.MapPost("/api/posts", async (CreateBlogPostRequest request, IContentService 
 // --- Update Blog Post ---
 app.MapPut("/api/posts/{slug}", async (string slug, UpdateBlogPostRequest request, IContentService contentService, ClaimsPrincipal user) =>
 {
-    //only "Admin" or "Author" roles can update posts
+    //only admin or author roles can update posts
     if (!user.IsInRole("Admin") && !user.IsInRole("Author"))
     {
         return Results.Forbid(); 
@@ -335,6 +336,144 @@ app.MapDelete("/api/posts/{slug}", async (string slug, IContentService contentSe
 .Produces(StatusCodes.Status404NotFound) 
 .Produces(StatusCodes.Status500InternalServerError);
 
+// --- Create Category ---
+app.MapPost("/api/categories", async (CreateCategoryRequest request, IContentService contentService, ClaimsPrincipal user) =>
+{
+    // only admin or author roles can create categories
+    if (!user.IsInRole("Admin") && !user.IsInRole("Author"))
+    {
+        return Results.Forbid(); 
+    }
+
+    if (string.IsNullOrWhiteSpace(request.Name))
+    {
+        return Results.BadRequest("Category name cannot be empty.");
+    }
+
+    var newCategory = await contentService.CreateCategoryAsync(request);
+
+    if (newCategory == null)
+    {
+        return Results.Conflict($"Category '{request.Name}' already exists or could not be created.");
+    }
+
+    return Results.CreatedAtRoute("GetAllCategories", new { }, newCategory); 
+})
+.RequireAuthorization()
+.WithName("CreateCategory")
+.Produces<Category>(StatusCodes.Status201Created)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status403Forbidden)
+.Produces(StatusCodes.Status409Conflict)
+.Produces(StatusCodes.Status500InternalServerError)
+.Accepts<CreateCategoryRequest>("application/json");
+
+// --- Update Category ---
+app.MapPut("/api/categories/{oldName}", async (string oldName, UpdateCategoryRequest request, IContentService contentService, ClaimsPrincipal user) =>
+{
+    // only admin or author roles can update categories
+    if (!user.IsInRole("Admin") && !user.IsInRole("Author"))
+    {
+        return Results.Forbid();
+    }
+
+    if (string.IsNullOrWhiteSpace(request.NewName))
+    {
+        return Results.BadRequest("New category name cannot be empty.");
+    }
+
+    var updatedCategory = await contentService.UpdateCategoryAsync(oldName, request);
+
+    if (updatedCategory == null)
+    {
+        var categories = await contentService.GetAllCategoriesAsync();
+        if (categories.Any(c => c.Name.Equals(request.NewName, StringComparison.OrdinalIgnoreCase)))
+        {
+             return Results.Conflict($"Category with new name '{request.NewName}' already exists.");
+        }
+        return Results.NotFound($"Category '{oldName}' not found or could not be updated.");
+    }
+
+    return Results.Ok(updatedCategory);
+})
+.RequireAuthorization()
+.WithName("UpdateCategory")
+.Produces<Category>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status403Forbidden)
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status409Conflict)
+.Produces(StatusCodes.Status500InternalServerError)
+.Accepts<UpdateCategoryRequest>("application/json");
+
+// --- Delete Category ---
+app.MapDelete("/api/categories/{name}", async (string name, IContentService contentService, ClaimsPrincipal user) =>
+{
+    // only admin role can delete categories
+    if (!user.IsInRole("Admin"))
+    {
+        return Results.Forbid(); 
+    }
+
+    var deleted = await contentService.DeleteCategoryAsync(name);
+
+    if (!deleted)
+    {
+        return Results.NotFound($"Category '{name}' not found or could not be deleted.");
+    }
+
+    return Results.NoContent();
+})
+.RequireAuthorization()
+.WithName("DeleteCategory")
+.Produces(StatusCodes.Status204NoContent)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status403Forbidden)
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status500InternalServerError);
+
+
+
+app.MapPost("/api/tags", async (CreateTagRequest request, IContentService contentService) =>
+{
+    var tag = await contentService.CreateTagAsync(request);
+    if (tag == null)
+    {
+        // This might mean a tag with that name/slug already exists
+        return Results.Conflict("A tag with this name already exists or could not be created.");
+    }
+    return Results.CreatedAtRoute("GetAllTags", new { }, tag); // Return 201 CreatedAtRoute
+})
+.WithName("CreateTag")
+.WithOpenApi();
+// .RequireAuthorization("AdminPolicy"); // Consider adding authorization if needed
+
+app.MapPut("/api/tags/{oldName}", async (string oldName, UpdateTagRequest request, IContentService contentService) =>
+{
+    var updatedTag = await contentService.UpdateTagAsync(oldName, request);
+    if (updatedTag == null)
+    {
+        return Results.NotFound($"Tag '{oldName}' not found or could not be updated (e.g., new name conflicts).");
+    }
+    return Results.Ok(updatedTag);
+})
+.WithName("UpdateTag")
+.WithOpenApi();
+// .RequireAuthorization("AdminPolicy"); // Consider adding authorization if needed
+
+app.MapDelete("/api/tags/{name}", async (string name, IContentService contentService) =>
+{
+    var success = await contentService.DeleteTagAsync(name);
+    if (!success)
+    {
+        return Results.NotFound($"Tag '{name}' not found or could not be deleted.");
+    }
+    return Results.NoContent(); // 204 No Content for successful deletion
+})
+.WithName("DeleteTag")
+.WithOpenApi();
 
 // --- End API Endpoints ---
 
