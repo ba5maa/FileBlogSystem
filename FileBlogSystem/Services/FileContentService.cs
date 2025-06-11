@@ -14,6 +14,7 @@ namespace FileBlogSystem.Services
         private readonly string _postsFolderPath;
         private readonly string _categoriesFolderPath;
         private readonly string _tagsFolderPath;
+        private readonly string _usersFolderPath;
 
         public FileContentService(IWebHostEnvironment env, ILogger<FileContentService> logger)
         {
@@ -23,9 +24,11 @@ namespace FileBlogSystem.Services
             _postsFolderPath = Path.Combine(_contentRootPath, "posts");
             _categoriesFolderPath = Path.Combine(_contentRootPath, "categories");
             _tagsFolderPath = Path.Combine(_contentRootPath, "tags");
+            _usersFolderPath = Path.Combine(_contentRootPath, "users");
             Directory.CreateDirectory(_postsFolderPath);
             Directory.CreateDirectory(_categoriesFolderPath);
             Directory.CreateDirectory(_tagsFolderPath);
+            Directory.CreateDirectory(_usersFolderPath);
         }
 
         private async Task<T?> ReadJsonFileAsync<T>(string filePath) where T : class
@@ -142,11 +145,10 @@ namespace FileBlogSystem.Services
             var tags = new List<Tag>();
             try
             {
-                // Ensure the tags folder exists
                 if (!Directory.Exists(_tagsFolderPath))
                 {
-                    Directory.CreateDirectory(_tagsFolderPath); // Create if it doesn't exist
-                    return tags; // Return empty list if just created
+                    Directory.CreateDirectory(_tagsFolderPath);
+                    return tags;
                 }
 
                 var tagFiles = Directory.EnumerateFiles(_tagsFolderPath, "*.json", SearchOption.TopDirectoryOnly);
@@ -164,17 +166,31 @@ namespace FileBlogSystem.Services
             {
                 _logger.LogError(ex, $"Error reading tags from {_tagsFolderPath}.");
             }
-            return tags.OrderBy(t => t.Name).ToList(); // Always return sorted
+            return tags.OrderBy(t => t.Name).ToList();
         }
 
-        // --- User Methods ---
+        // --- GET User Method ---
         public async Task<User?> GetUserByUsernameAsync(string username)
         {
-            var userProfilePath = Path.Combine(_contentRootPath, "users", username, "profile.json");
-            return await ReadJsonFileAsync<User>(userProfilePath);
+            try
+            {
+                var userDir = Path.Combine(_usersFolderPath, username.Trim().ToLowerInvariant());
+                var profileFilePath = Path.Combine(userDir, "profile.json");
+
+                if (File.Exists(profileFilePath))
+                {
+                    var user = await ReadJsonFileAsync<User>(profileFilePath);
+                    return user;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting user '{username}'.");
+            }
+            return null;
         }
 
-        // --- New Write Method for Blog Posts ---
+        // --- Write Method for Blog Posts ---
         public async Task<BlogPostMeta?> CreateBlogPostAsync(CreateBlogPostRequest request)
         {
             try
@@ -344,7 +360,6 @@ namespace FileBlogSystem.Services
                 return false;
             }
         }
-
 
         // --- CRUD Methods for Categories ---
 
@@ -535,13 +550,13 @@ namespace FileBlogSystem.Services
             {
                 _logger.LogInformation($"Attempting to update tag '{oldName}' to '{request.NewName}'.");
 
-                var tags = await GetAllTagsAsync(); 
+                var tags = await GetAllTagsAsync();
                 var oldTag = tags.FirstOrDefault(t => t.Name.Equals(oldName.Trim(), StringComparison.OrdinalIgnoreCase));
 
                 if (oldTag == null)
                 {
                     _logger.LogWarning($"Tag '{oldName}' not found for update.");
-                    return null; 
+                    return null;
                 }
 
                 var originalSlugForFileMove = oldTag.Slug;
@@ -556,11 +571,11 @@ namespace FileBlogSystem.Services
                     tags.Any(t => t.Slug.Equals(newSlug, StringComparison.OrdinalIgnoreCase) && !t.Slug.Equals(originalSlugForFileMove, StringComparison.OrdinalIgnoreCase)))
                 {
                     _logger.LogWarning($"New tag name '{newName}' (slug: {newSlug}) conflicts with an existing tag.");
-                    return null; 
+                    return null;
                 }
 
                 oldTag.Name = newName;
-                oldTag.Slug = newSlug; 
+                oldTag.Slug = newSlug;
 
                 string newTagFilePath = oldTagFilePath;
 
@@ -608,13 +623,13 @@ namespace FileBlogSystem.Services
         {
             try
             {
-                var tags = await GetAllTagsAsync(); 
+                var tags = await GetAllTagsAsync();
                 var tagToDelete = tags.FirstOrDefault(t => t.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase));
 
                 if (tagToDelete == null)
                 {
                     _logger.LogWarning($"Tag '{name}' not found for deletion.");
-                    return false; 
+                    return false;
                 }
 
                 var tagFilePath = Path.Combine(_tagsFolderPath, $"{tagToDelete.Slug}.json");
@@ -628,12 +643,155 @@ namespace FileBlogSystem.Services
                 else
                 {
                     _logger.LogWarning($"Tag file for '{name}' (slug: {tagToDelete.Slug}) not found at expected path: {tagFilePath}.");
-                    return false; 
+                    return false;
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error deleting tag '{name}'.");
+                return false;
+            }
+        }
+
+        // ---User Profile Methods ---
+        public async Task<List<User>> GetAllUsersAsync()
+        {
+            var users = new List<User>();
+            try
+            {
+                if (!Directory.Exists(_usersFolderPath))
+                {
+                    Directory.CreateDirectory(_usersFolderPath);
+                    return users;
+                }
+
+                var userDirs = Directory.EnumerateDirectories(_usersFolderPath, "*", SearchOption.TopDirectoryOnly);
+
+                foreach (var userDirPath in userDirs)
+                {
+                    var profileFilePath = Path.Combine(userDirPath, "profile.json");
+                    if (File.Exists(profileFilePath))
+                    {
+                        var user = await ReadJsonFileAsync<User>(profileFilePath);
+                        if (user != null)
+                        {
+                            users.Add(user);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error reading users from {_usersFolderPath}.");
+            }
+            return users.OrderBy(u => u.Username).ToList(); 
+        }
+
+        public async Task<User?> CreateUserAsync(CreateUserRequest request)
+        {
+            try
+            {
+                var username = request.Username.Trim().ToLowerInvariant(); 
+                var userDir = Path.Combine(_usersFolderPath, username);
+                var profileFilePath = Path.Combine(userDir, "profile.json");
+
+                if (Directory.Exists(userDir) || File.Exists(profileFilePath))
+                {
+                    _logger.LogWarning($"User '{username}' already exists. Not creating.");
+                    return null;
+                }
+
+                Directory.CreateDirectory(userDir);
+
+                var newUser = new User
+                {
+                    Username = username,
+                    Email = request.Email.Trim(),
+                    HashedPassword = request.HashedPassword.Trim(),
+                    Roles = request.Roles ?? new List<string>()
+                };
+
+                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+                var json = JsonSerializer.Serialize(newUser, jsonOptions);
+                await File.WriteAllTextAsync(profileFilePath, json);
+
+                _logger.LogInformation($"Successfully created user profile for: {username} at {profileFilePath}");
+                return newUser;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error creating user '{request.Username}'.");
+                return null;
+            }
+        }
+
+        public async Task<User?> UpdateUserAsync(string username, UpdateUserRequest request)
+        {
+            try
+            {
+                var userToUpdateUsername = username.Trim().ToLowerInvariant();
+                _logger.LogInformation($"Attempting to update user '{userToUpdateUsername}'.");
+
+                var userDir = Path.Combine(_usersFolderPath, userToUpdateUsername);
+                var profileFilePath = Path.Combine(userDir, "profile.json");
+
+                if (!File.Exists(profileFilePath))
+                {
+                    _logger.LogWarning($"User '{userToUpdateUsername}' not found for update.");
+                    return null;
+                }
+
+                var existingUser = await ReadJsonFileAsync<User>(profileFilePath);
+                if (existingUser == null)
+                {
+                    _logger.LogError($"Could not deserialize existing user profile for '{userToUpdateUsername}'.");
+                    return null;
+                }
+
+                existingUser.Email = request.Email.Trim();
+                if (!string.IsNullOrEmpty(request.HashedPassword))
+                {
+                    existingUser.HashedPassword = request.HashedPassword.Trim();
+                }
+                existingUser.Roles = request.Roles ?? new List<string>(); 
+
+                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+                var json = JsonSerializer.Serialize(existingUser, jsonOptions);
+                await File.WriteAllTextAsync(profileFilePath, json); 
+
+                _logger.LogInformation($"Successfully updated user profile for: {userToUpdateUsername}");
+                return existingUser;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating user '{username}'.");
+                return null;
+            }
+        }
+        
+       public async Task<bool> DeleteUserAsync(string username)
+        {
+            try
+            {
+                var userToDeleteUsername = username.Trim().ToLowerInvariant();
+                var userDir = Path.Combine(_usersFolderPath, userToDeleteUsername);
+
+                if (Directory.Exists(userDir))
+                {
+                    await Task.Run(() => Directory.Delete(userDir, recursive: true));
+
+                    _logger.LogInformation($"Successfully deleted user directory: {userDir}");
+                    return true;
+                }
+                else
+                {
+                    _logger.LogWarning($"User directory for '{userToDeleteUsername}' not found at expected path: {userDir}.");
+                    return false; 
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting user '{username}'.");
                 return false;
             }
         }

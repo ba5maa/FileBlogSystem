@@ -441,14 +441,12 @@ app.MapPost("/api/tags", async (CreateTagRequest request, IContentService conten
     var tag = await contentService.CreateTagAsync(request);
     if (tag == null)
     {
-        // This might mean a tag with that name/slug already exists
         return Results.Conflict("A tag with this name already exists or could not be created.");
     }
     return Results.CreatedAtRoute("GetAllTags", new { }, tag); // Return 201 CreatedAtRoute
 })
 .WithName("CreateTag")
 .WithOpenApi();
-// .RequireAuthorization("AdminPolicy"); // Consider adding authorization if needed
 
 app.MapPut("/api/tags/{oldName}", async (string oldName, UpdateTagRequest request, IContentService contentService) =>
 {
@@ -461,7 +459,6 @@ app.MapPut("/api/tags/{oldName}", async (string oldName, UpdateTagRequest reques
 })
 .WithName("UpdateTag")
 .WithOpenApi();
-// .RequireAuthorization("AdminPolicy"); // Consider adding authorization if needed
 
 app.MapDelete("/api/tags/{name}", async (string name, IContentService contentService) =>
 {
@@ -470,9 +467,55 @@ app.MapDelete("/api/tags/{name}", async (string name, IContentService contentSer
     {
         return Results.NotFound($"Tag '{name}' not found or could not be deleted.");
     }
-    return Results.NoContent(); // 204 No Content for successful deletion
+    return Results.NoContent();
 })
 .WithName("DeleteTag")
+.WithOpenApi();
+
+// --- User Profile Endpoints ---
+app.MapGet("/api/users", async (IContentService contentService) =>
+{
+    var users = await contentService.GetAllUsersAsync();
+    return Results.Ok(users);
+})
+.WithName("GetAllUsers")
+.WithOpenApi();
+
+
+app.MapPost("/api/users", async (CreateUserRequest request, IContentService contentService) =>
+{
+    var user = await contentService.CreateUserAsync(request);
+    if (user == null)
+    {
+        return Results.Conflict("A user with this username already exists or could not be created.");
+    }
+    return Results.CreatedAtRoute("GetUserByUsername", new { username = user.Username }, user); // Return 201 CreatedAtRoute
+})
+.WithName("CreateUser")
+.WithOpenApi();
+
+app.MapPut("/api/users/{username}", async (string username, UpdateUserRequest request, IContentService contentService) =>
+{
+    var updatedUser = await contentService.UpdateUserAsync(username, request);
+    if (updatedUser == null)
+    {
+        return Results.NotFound($"User '{username}' not found or could not be updated.");
+    }
+    return Results.Ok(updatedUser);
+})
+.WithName("UpdateUser")
+.WithOpenApi();
+
+app.MapDelete("/api/users/{username}", async (string username, IContentService contentService) =>
+{
+    var success = await contentService.DeleteUserAsync(username);
+    if (!success)
+    {
+        return Results.NotFound($"User '{username}' not found or could not be deleted.");
+    }
+    return Results.NoContent(); 
+})
+.WithName("DeleteUser")
 .WithOpenApi();
 
 // --- End API Endpoints ---

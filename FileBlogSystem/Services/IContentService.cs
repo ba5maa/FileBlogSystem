@@ -18,6 +18,10 @@ namespace FileBlogSystem.Services
         Task<Tag?> CreateTagAsync(CreateTagRequest request);
         Task<Tag?> UpdateTagAsync(string oldName, UpdateTagRequest request);
         Task<bool> DeleteTagAsync(string name);
+        Task<List<User>> GetAllUsersAsync();
+        Task<User?> CreateUserAsync(CreateUserRequest request);
+        Task<User?> UpdateUserAsync(string username, UpdateUserRequest request);
+        Task<bool> DeleteUserAsync(string username);
 
     }
 }

@@ -9,7 +9,7 @@ namespace FileBlogSystem.Models
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
 
-        [JsonPropertyName("PublishedDate")] 
+        [JsonPropertyName("PublishedDate")]
         public DateTime PublishedDate { get; set; }
 
         [JsonPropertyName("ModificationDate")]
@@ -21,13 +21,17 @@ namespace FileBlogSystem.Models
         [JsonPropertyName("CustomUrl")]
         public string? CustomUrl { get; set; } // Nullable because it might not always be defined
 
-        // Add a property that won't be serialized to JSON, but useful in code
         [JsonIgnore]
-        public string? Slug { get; set; } 
+        public string? Slug { get; set; }
 
         [JsonIgnore]
-        public string? ContentFilePath { get; set; } // Path to the content.md file
+        public string? ContentFilePath { get; set; }
         [JsonIgnore]
-        public string? PostFolderPath { get; set; } // Path to the YYYY-MM-DD-post-slug folder
+        public string? PostFolderPath { get; set; }
+        [JsonPropertyName("isDraft")] 
+        public bool IsDraft { get; set; }
+        [JsonIgnore] 
+        public string Content { get; set; } = string.Empty;
+
     }
 }
