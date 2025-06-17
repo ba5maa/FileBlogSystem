@@ -5,7 +5,8 @@ namespace FileBlogSystem.Models
 {
     public class UpdateBlogPostRequest
     {
-        public string Slug { get; set; } = string.Empty;
+        [Required]
+        public Guid Id { get; set; }
 
         [Required]
         public string Title { get; set; } = string.Empty;
@@ -20,5 +21,10 @@ namespace FileBlogSystem.Models
         public List<string> Categories { get; set; } = new List<string>();
 
         public string? CustomUrl { get; set; }
+        public bool IsDraft { get; set; }
+        public string? ImageUrl { get; set; }
+        public string? Base64Image { get; set; }
+        public DateTime? PublishedDate { get; set; }
+
     }
 }

@@ -1,0 +1,8 @@
+{
+  "Username": "admin2",
+  "Email": "admin2@gmail.com",
+  "Roles": [
+    "Admin"
+  ],
+  "HashedPassword": "$2a$10$nlQPPwV1Qa5yFN0y/zPYk.zv7EMczAcosmZZwRSchHtC0Fgsp1qqa"
+}

@@ -3,7 +3,9 @@ using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.IO;
-using System.Linq; 
+using System.Linq;
+using FileBlogSystem.Security;
+using Microsoft.AspNetCore.Hosting;
 
 namespace FileBlogSystem.Services
 {
@@ -70,24 +72,29 @@ namespace FileBlogSystem.Services
 
                 if (meta != null)
                 {
-                    // Extract slug from folder name (YYYY-MM-DD-post-slug)
                     var folderName = Path.GetFileName(postFolder);
                     meta.Slug = folderName.Length > 11 && folderName[4] == '-' && folderName[7] == '-' && folderName[10] == '-'
-                                ? folderName.Substring(11) // remove YYYY-MM-DD-
-                                : folderName; // fallback if format is unexpected
+                                ? folderName.Substring(11)
+                                : folderName; 
 
-                    meta.PostFolderPath = postFolder; //store the full path for content reading later
+                    meta.PostFolderPath = postFolder;
                     postsMeta.Add(meta);
                 }
             }
 
-            return postsMeta.OrderByDescending(p => p.PublishedDate).ToList(); // Order by date
+            return postsMeta.OrderByDescending(p => p.PublishedDate.HasValue ? p.PublishedDate.Value : DateTime.MinValue).ToList(); 
         }
 
         public async Task<BlogPostMeta?> GetBlogPostMetaBySlugAsync(string slug)
         {
             var allPosts = await GetAllBlogPostsMetaAsync();
             return allPosts.FirstOrDefault(p => p.Slug?.Equals(slug, StringComparison.OrdinalIgnoreCase) == true);
+        }
+
+        public async Task<BlogPostMeta?> GetBlogPostMetaByIdAsync(Guid id)
+        {
+            var allPosts = await GetAllBlogPostsMetaAsync();
+            return allPosts.FirstOrDefault(p => p.Id == id);
         }
 
         public async Task<string?> GetBlogPostContentAsync(string postFolderPath)
@@ -199,43 +206,51 @@ namespace FileBlogSystem.Services
                                ? GenerateSlug(request.CustomUrl)
                                : GenerateSlug(request.Title);
 
+                 
                 var datePrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
                 var postFolderName = $"{datePrefix}-{baseSlug}";
                 var postFolderPath = Path.Combine(_contentRootPath, "posts", postFolderName);
 
                 if (Directory.Exists(postFolderPath))
                 {
-                    // Handle potential rare conflict, e.g., by appending a timestamp or GUID
                     postFolderName = $"{datePrefix}-{baseSlug}-{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
                     postFolderPath = Path.Combine(_contentRootPath, "posts", postFolderName);
                 }
 
-
-                // create the post directory
                 Directory.CreateDirectory(postFolderPath);
 
-                // prepare BlogPostMeta for saving
                 var now = DateTime.UtcNow;
                 var newPostMeta = new BlogPostMeta
                 {
                     Title = request.Title,
                     Description = request.Description,
-                    PublishedDate = now,
+                    PublishedDate = request.PublishedDate ?? (request.IsDraft ? null : now),
                     ModificationDate = now,
-                    Tags = request.Tags ?? new List<string>(), // handle potential null
+                    Tags = request.Tags ?? new List<string>(), 
                     Categories = request.Categories ?? new List<string>(),
                     CustomUrl = request.CustomUrl,
-                    Slug = baseSlug, // store the generated slug here
-                    PostFolderPath = postFolderPath // store the path for internal use
+                    Slug = baseSlug,
+                    PostFolderPath = postFolderPath,
+                    AuthorUsername = request.AuthorUsername ?? string.Empty,
+                    IsDraft = request.IsDraft
                 };
+                
+                if (!string.IsNullOrEmpty(request.Base64Image))
+                {
+                    var imageFileName = await SaveBase64ImageAsync(postFolderPath, request.Base64Image);
+                    if (imageFileName != null)
+                    {
+                        newPostMeta.ImageUrl = $"/content/posts/{postFolderName}/assets/{imageFileName}";
+                    }
+                }
 
-                // save meta.json
+               
                 var metaFilePath = Path.Combine(postFolderPath, "meta.json");
                 var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
                 var metaJson = JsonSerializer.Serialize(newPostMeta, jsonOptions);
                 await File.WriteAllTextAsync(metaFilePath, metaJson);
 
-                // save content.md
+        
                 var contentFilePath = Path.Combine(postFolderPath, "content.md");
                 await File.WriteAllTextAsync(contentFilePath, request.Content);
 
@@ -250,13 +265,44 @@ namespace FileBlogSystem.Services
             }
         }
 
+        private async Task<string?> SaveBase64ImageAsync(string postFolderPath, string base64Image)
+        {
+            try
+            {
+                var base64Data = Regex.Replace(base64Image, @"^data:image\/(png|jpeg|jpg|gif);base64,", "", RegexOptions.IgnoreCase);
+                byte[] imageBytes = Convert.FromBase64String(base64Data);
+
+                string fileExtension = ".png"; 
+                if (base64Image.Contains("image/jpeg")) fileExtension = ".jpeg";
+                else if (base64Image.Contains("image/jpg")) fileExtension = ".jpg";
+                else if (base64Image.Contains("image/gif")) fileExtension = ".gif";
+                else if (base64Image.Contains("image/webp")) fileExtension = ".webp";
+
+                var assetsFolderPath = Path.Combine(postFolderPath, "assets");
+                Directory.CreateDirectory(assetsFolderPath);
+
+                var fileName = $"{Guid.NewGuid()}{fileExtension}";
+                var filePath = Path.Combine(assetsFolderPath, fileName);
+
+                await File.WriteAllBytesAsync(filePath, imageBytes);
+                _logger.LogInformation($"Saved image: {filePath}");
+                return fileName;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving base64 image.");
+                return null;
+            }
+        }
+
+
         // --- Helper method for slug generation ---
         private string GenerateSlug(string title)
         {
             var slug = title.ToLowerInvariant();
-            slug = Regex.Replace(slug, @"[^a-z0-9\s-]", ""); // Remove invalid chars
-            slug = Regex.Replace(slug, @"\s+", "-").Trim(); // Convert spaces to hyphens
-            slug = Regex.Replace(slug, @"-+", "-");        // Collapse multiple hyphens
+            slug = Regex.Replace(slug, @"[^a-z0-9\s-]", ""); 
+            slug = Regex.Replace(slug, @"\s+", "-").Trim(); 
+            slug = Regex.Replace(slug, @"-+", "-"); 
             return slug;
         }
 
@@ -317,6 +363,58 @@ namespace FileBlogSystem.Services
             existingPostMeta.CustomUrl = request.CustomUrl;
             existingPostMeta.Slug = newBaseSlug;
             existingPostMeta.PostFolderPath = newPostFolderPath;
+            existingPostMeta.IsDraft = request.IsDraft;
+            existingPostMeta.PublishedDate = request.PublishedDate;
+
+
+ if (!string.IsNullOrEmpty(request.Base64Image)) 
+            {
+                
+                if (!string.IsNullOrEmpty(existingPostMeta.ImageUrl))
+                {
+                    try
+                    {
+                       
+                        var oldImageRelativePath = existingPostMeta.ImageUrl.Replace("/content/", "").Replace('/', Path.DirectorySeparatorChar);
+                        var oldImageFilePath = Path.Combine(_contentRootPath, oldImageRelativePath);
+                        
+                        if (File.Exists(oldImageFilePath))
+                        {
+                            File.Delete(oldImageFilePath);
+                            _logger.LogInformation($"Deleted old image: {oldImageFilePath}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Error deleting old image for post {originalSlug}.");
+                    }
+                }
+
+                var imageFileName = await SaveBase64ImageAsync(newPostFolderPath, request.Base64Image);
+                if (imageFileName != null)
+                {
+                    existingPostMeta.ImageUrl = $"/content/posts/{newPostFolderName}/assets/{imageFileName}";
+                }
+            }
+            else if (request.ImageUrl == null && existingPostMeta.ImageUrl != null) 
+            {
+                 try
+                {
+                    var oldImageRelativePath = existingPostMeta.ImageUrl.Replace("/content/", "").Replace('/', Path.DirectorySeparatorChar);
+                    var oldImageFilePath = Path.Combine(_contentRootPath, oldImageRelativePath);
+                    if (File.Exists(oldImageFilePath))
+                    {
+                        File.Delete(oldImageFilePath);
+                        _logger.LogInformation($"Deleted old image (explicitly removed by user): {oldImageFilePath}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error deleting old image explicitly removed by user for post {originalSlug}.");
+                }
+                existingPostMeta.ImageUrl = null;
+            }
+
 
             try
             {
@@ -326,7 +424,7 @@ namespace FileBlogSystem.Services
                 await File.WriteAllTextAsync(metaFilePath, updatedMetaJson);
 
                 var contentFilePath = Path.Combine(newPostFolderPath, "content.md");
-                await File.WriteAllTextAsync(contentFilePath, request.Content); // Save the updated content
+                await File.WriteAllTextAsync(contentFilePath, request.Content);
 
                 _logger.LogInformation($"Successfully updated blog post: {existingPostMeta.Title} (New Slug: {existingPostMeta.Slug})");
                 return existingPostMeta;
@@ -463,7 +561,7 @@ namespace FileBlogSystem.Services
 
                 var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
                 var json = JsonSerializer.Serialize(oldCategory, jsonOptions);
-                await File.WriteAllTextAsync(newCategoryFilePath, json); // Write to the correct (new or old) path
+                await File.WriteAllTextAsync(newCategoryFilePath, json);
 
                 _logger.LogInformation($"Successfully updated category data for '{newName}' (Slug: {newSlug}). Saved to: {newCategoryFilePath}");
                 return oldCategory;
@@ -515,7 +613,7 @@ namespace FileBlogSystem.Services
             try
             {
                 var tagName = request.Name.Trim();
-                var tagSlug = GenerateSlug(tagName); // Generate slug from name
+                var tagSlug = GenerateSlug(tagName);
 
                 var tagFilePath = Path.Combine(_tagsFolderPath, $"{tagSlug}.json");
                 if (File.Exists(tagFilePath))
@@ -702,12 +800,12 @@ namespace FileBlogSystem.Services
                 }
 
                 Directory.CreateDirectory(userDir);
-
+                 string hashedPassword = PasswordHasher.HashPassword(request.Password);
                 var newUser = new User
                 {
                     Username = username,
                     Email = request.Email.Trim(),
-                    HashedPassword = request.HashedPassword.Trim(),
+                    HashedPassword = hashedPassword,
                     Roles = request.Roles ?? new List<string>()
                 };
 

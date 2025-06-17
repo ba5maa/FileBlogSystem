@@ -5,10 +5,12 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt; 
 using System.Text;
 using System.Security.Claims; 
-using FileBlogSystem.Security; // for PasswordHasher
+using FileBlogSystem.Security;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.Extensions.FileProviders;
+using System.IO;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,7 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("config/site.json", optional: false, reloadOnChange: true);
 builder.Services.Configure<SiteConfiguration>(builder.Configuration); 
 builder.Services.AddSingleton<IContentService, FileContentService>();
-builder.Services.AddEndpointsApiExplorer(); //for Swagger
+builder.Services.AddEndpointsApiExplorer(); //for swagger
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -67,6 +69,7 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+
 builder.Services.AddAuthorization(); 
 
 // --- End JWT Authentication Configuration ---
@@ -81,8 +84,8 @@ if (app.Environment.IsDevelopment())
  
 }
 
-app.UseHttpsRedirection(); 
-
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
@@ -90,12 +93,38 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/content"
 });
 
+
+app.UseAuthentication();
+app.UseAuthorization();
 // --- Define API Endpoints ---
 
 // Get all blog posts metadata
 app.MapGet("/api/posts", async (IContentService contentService) =>
 {
-    var posts = await contentService.GetAllBlogPostsMetaAsync();
+var postMetas = await contentService.GetAllBlogPostsMetaAsync();
+var posts = new List<object>();
+
+foreach (var meta in postMetas)
+{
+    var content = await contentService.GetBlogPostContentAsync(meta.PostFolderPath!);
+    posts.Add(new
+    {
+        meta.Id,
+        meta.Title,
+        meta.Description,
+        meta.CreationDate,
+        meta.PublishedDate,
+        meta.ModificationDate,
+        meta.Tags,
+        meta.Categories,
+        meta.CustomUrl,
+        meta.Slug,
+        meta.AuthorUsername,
+        meta.IsDraft,
+        meta.ImageUrl,
+        Content = content ?? ""
+    });
+}
     return Results.Ok(posts); // Returns 200 OK with JSON array of posts
 })
 .WithName("GetAllPosts")
@@ -121,10 +150,13 @@ app.MapGet("/api/posts/{slug}", async (string slug, IContentService contentServi
         postMeta.Title,
         postMeta.Description,
         postMeta.PublishedDate,
+        postMeta.CreationDate,
+        postMeta.AuthorUsername,
         postMeta.ModificationDate,
         postMeta.Tags,
         postMeta.Categories,
         postMeta.CustomUrl,
+        postMeta.ImageUrl,
         postMeta.Slug,
         Content = content 
     });
@@ -171,17 +203,24 @@ app.MapGet("/api/users/{username}", async (string username, IContentService cont
 
 app.MapPost("/api/auth/login", async (LoginRequest request, IContentService contentService, IConfiguration config) =>
 {
+    Console.WriteLine($"Login attempt for username: {request.Username}");
+    Console.WriteLine($"Received password (plaintext, for debug only): {request.Password}");
+
     var user = await contentService.GetUserByUsernameAsync(request.Username);
     if (user == null)
     {
-        return Results.Unauthorized(); 
+        return Results.Unauthorized();
     }
+
+    Console.WriteLine($"User found: {user.Username}. Stored hash: {user.HashedPassword}");
 
     // verify password
     if (!PasswordHasher.VerifyPassword(request.Password, user.HashedPassword))
     {
         return Results.Unauthorized();
     }
+
+    Console.WriteLine($"Login successful for user: {user.Username}. Generating token...");
 
     var jwtSecret = config["Jwt:Key"];
     var issuer = config["Jwt:Issuer"];
@@ -194,9 +233,9 @@ app.MapPost("/api/auth/login", async (LoginRequest request, IContentService cont
 
     var claims = new List<Claim>
     {
-        new Claim(ClaimTypes.NameIdentifier, user.Username), 
-        new Claim(ClaimTypes.Name, user.Username)  
-        
+        new Claim(ClaimTypes.NameIdentifier, user.Username),
+        new Claim(ClaimTypes.Name, user.Username)
+
     };
     foreach (var role in user.Roles)
     {
@@ -215,7 +254,12 @@ app.MapPost("/api/auth/login", async (LoginRequest request, IContentService cont
         signingCredentials: creds
     );
 
-    return Results.Ok(new { Token = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().WriteToken(token), Expires = expires });
+    return Results.Ok(new
+    {
+        Token = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().WriteToken(token),
+        Expires = expires,
+        User = new { user.Username, user.Email, user.Roles } 
+    });
 })
 .WithName("Login")
 .Produces<object>(StatusCodes.Status200OK) 
@@ -225,26 +269,25 @@ app.MapPost("/api/auth/login", async (LoginRequest request, IContentService cont
 
 // --- Protected Endpoints ---
 
-// Endpoint requiring authentication (any valid token)
 app.MapGet("/api/protected", (ClaimsPrincipal user) =>
 {
     return Results.Ok($"Hello, {user.Identity?.Name}! You are authenticated.");
 })
-.RequireAuthorization() //Requires authentication
+.RequireAuthorization()
 .WithName("GetProtectedData")
 .Produces<string>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status401Unauthorized); 
 
-// Endpoint requiring a specific role
+
 app.MapGet("/api/admin/info", (ClaimsPrincipal user) =>
 {
     return Results.Ok($"Welcome, Admin {user.Identity?.Name}! You have access to admin info.");
 })
-.RequireAuthorization(policyBuilder => policyBuilder.RequireRole("Admin")) // Requires 'Admin' role
+.RequireAuthorization(policyBuilder => policyBuilder.RequireRole("Admin"))
 .WithName("GetAdminInfo")
 .Produces<string>(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status401Unauthorized) // Not authenticated
-.Produces(StatusCodes.Status403Forbidden); // Authenticated but not authorized (wrong role)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status403Forbidden); 
 
 // ---Create Blog Post ---
 app.MapPost("/api/posts", async (CreateBlogPostRequest request, IContentService contentService, ClaimsPrincipal user) =>
@@ -443,7 +486,7 @@ app.MapPost("/api/tags", async (CreateTagRequest request, IContentService conten
     {
         return Results.Conflict("A tag with this name already exists or could not be created.");
     }
-    return Results.CreatedAtRoute("GetAllTags", new { }, tag); // Return 201 CreatedAtRoute
+    return Results.CreatedAtRoute("GetAllTags", new { }, tag);
 })
 .WithName("CreateTag")
 .WithOpenApi();
@@ -489,7 +532,7 @@ app.MapPost("/api/users", async (CreateUserRequest request, IContentService cont
     {
         return Results.Conflict("A user with this username already exists or could not be created.");
     }
-    return Results.CreatedAtRoute("GetUserByUsername", new { username = user.Username }, user); // Return 201 CreatedAtRoute
+    return Results.CreatedAtRoute("GetUserByUsername", new { username = user.Username }, user); 
 })
 .WithName("CreateUser")
 .WithOpenApi();

@@ -5,7 +5,7 @@ namespace FileBlogSystem.Services
     {
         Task<List<BlogPostMeta>> GetAllBlogPostsMetaAsync();
         Task<BlogPostMeta?> GetBlogPostMetaBySlugAsync(string slug);
-        Task<string?> GetBlogPostContentAsync(string postFolderPath); // Path to the content.md
+        Task<string?> GetBlogPostContentAsync(string postFolderPath);
         Task<List<Category>> GetAllCategoriesAsync();
         Task<List<Tag>> GetAllTagsAsync();
         Task<User?> GetUserByUsernameAsync(string username);
