@@ -4,15 +4,16 @@
   "Description": "",
   "CreationDate": "2025-06-16T19:49:22.1047469Z",
   "PublishedDate": "2025-06-16T19:49:22.089Z",
-  "ModificationDate": "2025-06-16T20:08:39.4949979Z",
+  "ModificationDate": "2025-06-19T21:17:25.5201067Z",
   "Tags": [
     "Tutorial"
   ],
   "Categories": [],
   "CustomUrl": null,
   "Slug": "testing-the-draft",
-  "isDraft": true,
+  "isDraft": false,
   "Content": "",
   "ImageUrl": null,
-  "AuthorUsername": "admin"
+  "AuthorUsername": "admin",
+  "ScheduledFor": null
 }

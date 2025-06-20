@@ -346,15 +346,10 @@ document.addEventListener("DOMContentLoaded", () => {
                                 </select>
                             </div>
                             <div class="form-group" id="schedule-group" style="display: none;">
-                                <label for="schedule-time">Schedule for</label>
-                                <select id="schedule-time">
-                                    <option value="1">1 hour from now</option>
-                                    <option value="2">2 hours from now</option>
-                                    <option value="3">3 hours from now</option>
-                                    <option value="6">6 hours from now</option>
-                                    <option value="12">12 hours from now</option>
-                                    <option value="24">24 hours from now</option>
-                                </select>
+                                <label for="schedule-date">Schedule Date</label>
+                                <input type="date" id="schedule-date" min="${getMinDate()}">
+                                <label for="schedule-time">Schedule Time</label>
+                                <input type="time" id="schedule-time">
                             </div>
                         </div>
 
@@ -398,6 +393,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const submitBtnText = document.getElementById("submit-btn-text");
         const messageElement = document.getElementById("create-post-message");
         const postImageInput = document.getElementById("post-image");
+        const scheduleDateInput = document.getElementById("schedule-date");
+        const scheduleTimeInput = document.getElementById("schedule-time");
+
+        scheduleDateInput.min = getMinDate();
 
         statusSelect.addEventListener("change", () => {
             if (statusSelect.value === "schedule") {
@@ -418,7 +417,28 @@ document.addEventListener("DOMContentLoaded", () => {
             );
 
             const status = document.getElementById("post-status").value;
-            const scheduledTimeValue = document.getElementById("schedule-time").value;
+            let publishedDate = null;
+            
+            if (status === "publish") {
+                publishedDate = new Date().toISOString(); // Publish now
+            } else if (status === "schedule") {
+                const dateVal = scheduleDateInput.value;
+                const timeVal = scheduleTimeInput.value;
+
+                if (!dateVal || !timeVal) {
+                    showMessage("Please select both a date and time for scheduling.", "error", messageElement);
+                    return;
+                }
+
+                const scheduledDateTime = new Date(`${dateVal}T${timeVal}:00`); // Assuming time is HH:MM
+                const now = new Date();
+
+                if (scheduledDateTime <= now) {
+                    showMessage("Scheduled date and time must be in the future.", "error", messageElement);
+                    return;
+                }
+                publishedDate = scheduledDateTime.toISOString();
+            }
 
             const newPost = {
                 title: document.getElementById("post-title").value,
@@ -426,10 +446,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 content: document.getElementById("post-content").value,
                 category: document.getElementById("post-category").value,
                 tags: selectedTags,
-                isDraft: status === "draft",
-                publishedDate: null,
+                isDraft: status === "draft" || (status === "schedule" && new Date(publishedDate) > new Date()),
+                publishedDate: publishedDate,
                 scheduledFor: status === "schedule"
-                    ? new Date(Date.now() + Number.parseInt(scheduledTimeValue) * 60 * 60 * 1000).toISOString()
+                    ? new Date(`${scheduleDateInput.value}T${scheduleTimeInput.value}:00`).toISOString()
                     : null,
                 ImageUrl: null,
                 Base64Image: null
@@ -498,6 +518,14 @@ document.addEventListener("DOMContentLoaded", () => {
          }
     }
 
+    function getMinDate() {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
     function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -544,7 +572,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             const headers = isAuthenticated() ? { 'Authorization': `Bearer ${token}` } : {};
-            const response = await fetch(url, { headers });
+            const response = await fetch(`/api/posts?searchTerm=${encodeURIComponent(searchTerm)}`);
 
             if (!response.ok) {
                 const errorData = response.headers.get('Content-Type')?.includes('application/json') ? await response.json() : await response.text();
@@ -700,7 +728,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function loadDrafts() {
         const draftsContainer = document.getElementById("drafts-container");
-
+        
         draftsContainer.innerHTML = `
             <div class="loading-posts">
                 <i class="fas fa-spinner fa-spin"></i>
@@ -709,18 +737,20 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
 
         try {
-            const url = `${API_BASE_URL}/api/posts?isDraft=true&AuthorUsername=${user.username}`; 
-            const response = await fetchAuthenticated(url);
+            //const url = `${API_BASE_URL}/api/posts?isDraft=true&AuthorUsername=${user.username}`; 
+            const responsedraft = await fetch(`/api/posts?authorUsername=${user.username}&isDraft=true`);
+            const response = await fetch(`/api/posts?authorUsername=${user.username}`);
 
             if (!response.ok) {
                 const errorData = response.headers.get('Content-Type')?.includes('application/json') ? await response.json() : await response.text();
                 throw new Error(errorData.detail || errorData.message || `HTTP error! Status: ${response.status}`);
             }
-            const drafts = await response.json();
+            const drafts = await responsedraft.json();
+            const posts = await response.json();
 
             draftsContainer.innerHTML = "";
 
-            if (drafts.length === 0) {
+            if (drafts.length === 0 && posts.length === 0) {
                 draftsContainer.innerHTML = `
                     <div class="empty-state">
                         <i class="fas fa-file-alt"></i>
@@ -734,17 +764,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            drafts.forEach((draft) => {
+            [...drafts, ...posts].forEach((draft) => {
                 const draftCard = document.createElement("div");
                 draftCard.className = "draft-card";
                 draftCard.dataset.post = JSON.stringify(draft);
 
+
                 draftCard.innerHTML = `
                     <div class="draft-header">
-                        <h3>${draft.title}</h3>
-                        <span class="draft-date">Last modified: ${formatDate(draft.modificationDate || draft.createdAt)}</span>
+                        <div class="author-details">
+                            <span class="post-author">@${draft.authorUsername || 'Unknown'}</span>
+                            <span class="draft-date">Last modified: ${formatDate(draft.modificationDate || draft.createdAt)}</span>
+                        </div>
+                        <div class="post-status">
+                            ${draft.isDraft ? '<span class="draft-badge"><i class="fas fa-edit"></i> Draft</span>' : '<span class="published-badge"><i class="fas fa-check-circle"></i> Published</span>'}
+                        </div>
                     </div>
                     <div class="draft-content">
+                        <h3>${draft.title}</h3>
                         <p>${draft.content.substring(0, 150)}${draft.content.length > 150 ? '...' : ''}</p>
                         <div class="draft-meta">
                             <span class="draft-category">${draft.categories || 'Uncategorized'}</span>
@@ -756,8 +793,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     </div>
                     <div class="draft-actions">
-                        <button class="btn btn-primary edit-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-edit"></i> Continue Editing</button>
-                        <button class="btn btn-success publish-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-paper-plane"></i> Publish</button>
+                        <button class="btn btn-primary edit-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-edit"></i> Edit</button>
+                        ${(draft.isDraft && draft.publishedDate && new Date(draft.publishedDate) > new Date()) ?
+                           `<button class="btn btn-secondary cancel-schedule-btn" data-post-slug="${draft.slug}"><i class="fas fa-ban"></i> Cancel Schedule</button>` :
+                           `<button class="btn btn-success publish-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-paper-plane"></i> Publish Now</button>`
+                        }     
                         <button class="btn btn-danger delete-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-trash"></i> Delete</button>
                     </div>
                 `;
@@ -795,6 +835,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             });
 
+            draftsContainer.querySelectorAll('.cancel-schedule-btn').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const postSlug = e.currentTarget.dataset.postSlug;
+                    if (confirm('Are you sure you want to cancel the schedule and revert this post to a regular draft?')) {
+                        await cancelPostSchedule(postSlug);
+                        loadDrafts();
+                    }
+                });
+            });
+
         } catch (error) {
             draftsContainer.innerHTML = `
                 <div class="error-state">
@@ -807,6 +857,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function renderEditPostForm(postId, postData) {
+       let publishedDateValue = '';
+        let publishedTimeValue = '';
+        if (postData.publishedDate) {
+            const dateObj = new Date(postData.publishedDate);
+            publishedDateValue = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+            publishedTimeValue = dateObj.toTimeString().substring(0, 5); // HH:MM
+        }
+
         appContainer.innerHTML = `
             <div class="post-creation-section">
                 <h3><i class="fas fa-edit"></i> Edit Blog Post</h3>
@@ -853,7 +911,14 @@ document.addEventListener("DOMContentLoaded", () => {
                             <select id="edit-post-status">
                                 <option value="draft" ${postData.isDraft ? 'selected' : ''}>Save as Draft</option>
                                 <option value="publish" ${!postData.isDraft ? 'selected' : ''}>Publish Now</option>
+                                <option value="schedule" ${postData.isDraft && postData.publishedDate ? 'selected' : ''}>Schedule</option>
                             </select>
+                        </div>
+                        <div class="form-group" id="edit-schedule-group" style="display: ${postData.isDraft && postData.publishedDate ? 'block' : 'none'};">
+                            <label for="edit-schedule-date">Schedule Date</label>
+                            <input type="date" id="edit-schedule-date" value="${publishedDateValue}" min="${getMinDate()}">
+                            <label for="edit-schedule-time">Schedule Time</label>
+                            <input type="time" id="edit-schedule-time" value="${publishedTimeValue}">
                         </div>
                     </div>
 
@@ -879,6 +944,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const editPostImageInput = document.getElementById("edit-post-image");
         const removeImageBtn = document.querySelector('.remove-image-btn'); 
         let imageRemoved = false;
+        const editStatusSelect = document.getElementById("edit-post-status");
+        const editScheduleGroup = document.getElementById("edit-schedule-group");
+        const editScheduleDateInput = document.getElementById("edit-schedule-date");
+        const editScheduleTimeInput = document.getElementById("edit-schedule-time");
+
+        editScheduleDateInput.min = getMinDate();
 
         if (removeImageBtn) {
             removeImageBtn.addEventListener('click', () => {
@@ -891,6 +962,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 showMessage("Image marked for removal on update.", "info", messageElement);
             });
         }
+
+        editStatusSelect.addEventListener("change", () => {
+            if (editStatusSelect.value === "schedule") {
+                editScheduleGroup.style.display = "block";
+            } else {
+                editScheduleGroup.style.display = "none";
+            }
+        });
 
         cancelEditButton.addEventListener('click', () => {
             currentPage = postData.isDraft ? "drafts" : "feed";
@@ -908,6 +987,31 @@ document.addEventListener("DOMContentLoaded", () => {
             const newStatus = document.getElementById("edit-post-status").value;
             console.log("DEBUG just seeing newStatus:", newStatus);
             const wasDraft = postData.isDraft;
+            let publishedDate = null;
+
+            if (newStatus === "publish") {
+                publishedDate = new Date().toISOString(); // Publish now
+            } else if (newStatus === "schedule") {
+                const dateVal = editScheduleDateInput.value;
+                const timeVal = editScheduleTimeInput.value;
+
+                if (!dateVal || !timeVal) {
+                    showMessage("Please select both a date and time for scheduling.", "error", messageElement);
+                    return;
+                }
+
+                const scheduledDateTime = new Date(`${dateVal}T${timeVal}:00`);
+                const now = new Date();
+
+                if (scheduledDateTime <= now) {
+                    showMessage("Scheduled date and time must be in the future.", "error", messageElement);
+                    return;
+                }
+                publishedDate = scheduledDateTime.toISOString();
+            }
+            else if (!wasDraft && newStatus === "publish") {
+                publishedDate = postData.publishedDate;
+            }
 
             const updatedPost = {
                 id: postData.id,
@@ -916,7 +1020,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 content: document.getElementById("edit-post-content").value,
                 category: document.getElementById("edit-post-category").value,
                 tags: selectedTags,
-                isDraft: newStatus === "draft",
+                isDraft: newStatus === "draft" || newStatus === "schedule",
+                publishedDate: publishedDate,
                 ImageUrl: postData.ImageUrl,
                 Base64Image: null
             };
@@ -1057,6 +1162,44 @@ document.addEventListener("DOMContentLoaded", () => {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
+        });
+    }
+
+    async function cancelPostSchedule(postSlug) {
+        try {
+            const getResponse = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}`);
+            if (!getResponse.ok) throw new Error("Could not fetch post for canceling schedule.");
+            const postToUpdate = await getResponse.json();
+
+            // Revert to a regular draft by setting IsDraft to true and PublishedDate to null
+            postToUpdate.IsDraft = true;
+            postToUpdate.PublishedDate = null;
+
+            const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}`, {
+                method: 'PUT',
+                body: JSON.stringify(postToUpdate),
+            });
+
+            if (!response.ok) {
+                const errorData = response.headers.get('Content-Type')?.includes('application/json') ? await response.json() : await response.text();
+                throw new Error(errorData.detail || errorData.message || `Failed to cancel schedule: ${response.statusText}`);
+            }
+            showMessage("Post schedule cancelled and reverted to draft.", "success", appContainer);
+            return true;
+        } catch (error) {
+            console.error('Error cancelling schedule:', error);
+            showMessage(`Error cancelling schedule: ${error.message}`, "error", appContainer);
+            return false;
+        }
+    }
+
+    function formatTime(dateString) {
+        if (!dateString) return "";
+        const date = new Date(dateString);
+        return date.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
         });
     }
 

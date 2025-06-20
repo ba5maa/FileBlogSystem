@@ -1,0 +1,19 @@
+{
+  "Id": "1e9bfd2d-d076-49c5-99f4-681092c66147",
+  "Title": "testing filter",
+  "Description": "",
+  "CreationDate": "2025-06-19T21:32:19.7274405Z",
+  "PublishedDate": "2025-06-19T21:32:19.717Z",
+  "ModificationDate": "2025-06-19T21:32:19.7274341Z",
+  "Tags": [
+    "tag1"
+  ],
+  "Categories": [],
+  "CustomUrl": null,
+  "Slug": "testing-filter",
+  "isDraft": false,
+  "Content": "",
+  "ImageUrl": null,
+  "AuthorUsername": "admin",
+  "ScheduledFor": null
+}

@@ -58,6 +58,9 @@ namespace FileBlogSystem.Services
         {
             var postsMeta = new List<BlogPostMeta>();
             var postsDirectory = Path.Combine(_contentRootPath, "posts");
+            var now = DateTime.UtcNow;
+            var jsonOptions = new JsonSerializerOptions { WriteIndented = true }; // For saving meta.json
+
 
             if (!Directory.Exists(postsDirectory))
             {
@@ -78,11 +81,31 @@ namespace FileBlogSystem.Services
                                 : folderName; 
 
                     meta.PostFolderPath = postFolder;
+
+                    if (meta.IsDraft && meta.ScheduledFor.HasValue && meta.ScheduledFor.Value <= DateTime.UtcNow)
+                    {
+                        _logger.LogInformation($"Auto-publishing post '{meta.Title}' (slug: {meta.Slug}). Scheduled date has passed.");
+                        meta.IsDraft = false; 
+                        meta.ScheduledFor = null;
+                        meta.PublishedDate = DateTime.UtcNow;
+                        meta.ModificationDate = now; 
+
+                        try
+                        {
+                            var updatedMetaJson = JsonSerializer.Serialize(meta, jsonOptions);
+                            await File.WriteAllTextAsync(metaFilePath, updatedMetaJson);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, $"Error auto-publishing and saving meta for post '{meta.Title}'.");
+                        }
+                    }
+
                     postsMeta.Add(meta);
                 }
             }
 
-            return postsMeta.OrderByDescending(p => p.PublishedDate.HasValue ? p.PublishedDate.Value : DateTime.MinValue).ToList(); 
+            return postsMeta.OrderByDescending(p => p.PublishedDate.HasValue ? p.PublishedDate.Value : DateTime.MinValue).ToList();
         }
 
         public async Task<BlogPostMeta?> GetBlogPostMetaBySlugAsync(string slug)
@@ -224,15 +247,16 @@ namespace FileBlogSystem.Services
                 {
                     Title = request.Title,
                     Description = request.Description,
-                    PublishedDate = request.PublishedDate ?? (request.IsDraft ? null : now),
+                    PublishedDate = request.IsDraft ? null : request.PublishedDate,
                     ModificationDate = now,
-                    Tags = request.Tags ?? new List<string>(), 
+                    Tags = request.Tags ?? new List<string>(),
                     Categories = request.Categories ?? new List<string>(),
                     CustomUrl = request.CustomUrl,
                     Slug = baseSlug,
                     PostFolderPath = postFolderPath,
                     AuthorUsername = request.AuthorUsername ?? string.Empty,
-                    IsDraft = request.IsDraft
+                    IsDraft = request.IsDraft,
+                    ScheduledFor = request.ScheduledFor
                 };
                 
                 if (!string.IsNullOrEmpty(request.Base64Image))

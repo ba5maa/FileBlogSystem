@@ -11,6 +11,7 @@ using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.FileProviders;
 using System.IO;
+using Microsoft.AspNetCore.Mvc;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -99,32 +100,75 @@ app.UseAuthorization();
 // --- Define API Endpoints ---
 
 // Get all blog posts metadata
-app.MapGet("/api/posts", async (IContentService contentService) =>
+app.MapGet("/api/posts", async (IContentService contentService, [FromQuery] string? searchTerm, [FromQuery] string? tag, [FromQuery] string? category, [FromQuery] string? authorUsername, [FromQuery] bool? isDraft) =>
 {
 var postMetas = await contentService.GetAllBlogPostsMetaAsync();
 var posts = new List<object>();
+    var filteredPosts = postMetas.AsEnumerable();
 
-foreach (var meta in postMetas)
-{
-    var content = await contentService.GetBlogPostContentAsync(meta.PostFolderPath!);
-    posts.Add(new
+     if (isDraft == true && searchTerm == "scheduled")
     {
-        meta.Id,
-        meta.Title,
-        meta.Description,
-        meta.CreationDate,
-        meta.PublishedDate,
-        meta.ModificationDate,
-        meta.Tags,
-        meta.Categories,
-        meta.CustomUrl,
-        meta.Slug,
-        meta.AuthorUsername,
-        meta.IsDraft,
-        meta.ImageUrl,
-        Content = content ?? ""
-    });
-}
+        filteredPosts = filteredPosts.Where(p => p.ScheduledFor.HasValue && p.ScheduledFor.Value > DateTime.UtcNow);
+    }
+
+    if (isDraft.HasValue)
+    {
+        filteredPosts = filteredPosts.Where(p => p.IsDraft == isDraft.Value);
+    }
+    else
+    {
+        filteredPosts = filteredPosts.Where(p => !p.IsDraft);
+    }
+
+    if (!string.IsNullOrEmpty(authorUsername))
+    {
+        filteredPosts = filteredPosts.Where(p => p.AuthorUsername.Equals(authorUsername, StringComparison.OrdinalIgnoreCase));
+    }
+
+
+    if (!string.IsNullOrEmpty(searchTerm))
+    {
+        var lowerSearchTerm = searchTerm.ToLowerInvariant();
+        filteredPosts = filteredPosts.Where(p =>
+            p.Title.ToLowerInvariant().Contains(lowerSearchTerm) ||
+            p.Description.ToLowerInvariant().Contains(lowerSearchTerm) ||
+            p.Content?.ToLowerInvariant().Contains(lowerSearchTerm) == true ||
+            p.AuthorUsername.ToLowerInvariant().Contains(lowerSearchTerm));
+    }
+
+    if (!string.IsNullOrEmpty(tag))
+    {
+        var lowerTag = tag.ToLowerInvariant();
+        filteredPosts = filteredPosts.Where(p => p.Tags != null && p.Tags.Any(t => t.ToLowerInvariant() == lowerTag));
+    }
+
+    if (!string.IsNullOrEmpty(category))
+    {
+        var lowerCategory = category.ToLowerInvariant();
+        filteredPosts = filteredPosts.Where(p => p.Categories != null && p.Categories.Any(c => c.ToLowerInvariant() == lowerCategory));
+    }
+
+    foreach (var meta in filteredPosts)
+    {
+        var content = await contentService.GetBlogPostContentAsync(meta.PostFolderPath!);
+        posts.Add(new
+        {
+            meta.Id,
+            meta.Title,
+            meta.Description,
+            meta.CreationDate,
+            meta.PublishedDate,
+            meta.ModificationDate,
+            meta.Tags,
+            meta.Categories,
+            meta.CustomUrl,
+            meta.Slug,
+            meta.AuthorUsername,
+            meta.IsDraft,
+            meta.ImageUrl,
+            Content = content ?? ""
+        });
+    }
     return Results.Ok(posts); // Returns 200 OK with JSON array of posts
 })
 .WithName("GetAllPosts")

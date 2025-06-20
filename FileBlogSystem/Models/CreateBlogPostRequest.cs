@@ -21,8 +21,9 @@ namespace FileBlogSystem.Models
         public bool IsDraft { get; set; } = true;
         public string? ImageUrl { get; set; }
         public string? Base64Image { get; set; }
-        public string? AuthorUsername { get; set; } 
+        public string? AuthorUsername { get; set; }
         public DateTime? PublishedDate { get; set; }
+        public DateTime? ScheduledFor { get; set; }
 
     }
 }

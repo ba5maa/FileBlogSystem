@@ -14,7 +14,7 @@ namespace FileBlogSystem.Models
         public DateTime? PublishedDate { get; set; }
 
         [JsonPropertyName("ModificationDate")]
-        public DateTime ModificationDate { get; set; }= DateTime.UtcNow;
+        public DateTime ModificationDate { get; set; } = DateTime.UtcNow;
 
         public List<string> Tags { get; set; } = new List<string>();
         public List<string> Categories { get; set; } = new List<string>();
@@ -29,9 +29,10 @@ namespace FileBlogSystem.Models
         [JsonIgnore]
         public string? PostFolderPath { get; set; }
         [JsonPropertyName("isDraft")]
-        public bool IsDraft { get; set; }= true;
+        public bool IsDraft { get; set; } = true;
         public string Content { get; set; } = string.Empty;
-        public string? ImageUrl { get; set; } 
+        public string? ImageUrl { get; set; }
         public string AuthorUsername { get; set; } = string.Empty;
+        public DateTime? ScheduledFor { get; set; }
     }
 }
