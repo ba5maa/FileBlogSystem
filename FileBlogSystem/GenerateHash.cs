@@ -1,11 +1,6 @@
 using System;
-using BCrypt.Net; // Make sure you have the package added to your project
-using FileBlogSystem.Security; // Assuming this is within your FileBlogSystem project for simplicity
-
-// To run this:
-// 1. Ensure you have BCrypt.Net-Next NuGet package installed in your main project.
-// 2. Open a terminal in your project folder (FileBlogSystem).
-// 3. Run: dotnet run GenerateHash.cs
+using BCrypt.Net;
+using FileBlogSystem.Security;
 
 public class GenerateHash
 {

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace FileBlogSystem.Models
 {
-    public class User
+    public class UserResponse
     {
         public string Username { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;

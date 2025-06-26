@@ -4,17 +4,17 @@ using System.Text.Json.Serialization;
 
 namespace FileBlogSystem.Models
 {
-    public class BlogPostMeta
+    public class BlogPostMetaResponse
     {
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid Id { get; set; } 
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
-        public DateTime CreationDate { get; set; } = DateTime.UtcNow;
+        public DateTime CreationDate { get; set; }
         [JsonPropertyName("PublishedDate")]
         public DateTime? PublishedDate { get; set; }
 
         [JsonPropertyName("ModificationDate")]
-        public DateTime ModificationDate { get; set; } = DateTime.UtcNow;
+        public DateTime ModificationDate { get; set; } 
 
         public List<string> Tags { get; set; } = new List<string>();
         public List<string> Categories { get; set; } = new List<string>();

@@ -572,7 +572,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             const headers = isAuthenticated() ? { 'Authorization': `Bearer ${token}` } : {};
-            const response = await fetch(`/api/posts?searchTerm=${encodeURIComponent(searchTerm)}`);
+            const response = await fetchAuthenticated(`/api/posts?searchTerm=${encodeURIComponent(searchTerm)}`);
 
             if (!response.ok) {
                 const errorData = response.headers.get('Content-Type')?.includes('application/json') ? await response.json() : await response.text();
@@ -738,8 +738,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             //const url = `${API_BASE_URL}/api/posts?isDraft=true&AuthorUsername=${user.username}`; 
-            const responsedraft = await fetch(`/api/posts?authorUsername=${user.username}&isDraft=true`);
-            const response = await fetch(`/api/posts?authorUsername=${user.username}`);
+            const responsedraft = await fetchAuthenticated(`/api/posts?authorUsername=${user.username}&isDraft=true`);
+            const response = await fetchAuthenticated(`/api/posts?authorUsername=${user.username}`);
 
             if (!response.ok) {
                 const errorData = response.headers.get('Content-Type')?.includes('application/json') ? await response.json() : await response.text();
@@ -859,6 +859,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function renderEditPostForm(postId, postData) {
        let publishedDateValue = '';
         let publishedTimeValue = '';
+        postData.publishedDate = getMinDate();
         if (postData.publishedDate) {
             const dateObj = new Date(postData.publishedDate);
             publishedDateValue = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -990,7 +991,7 @@ document.addEventListener("DOMContentLoaded", () => {
             let publishedDate = null;
 
             if (newStatus === "publish") {
-                publishedDate = new Date().toISOString(); // Publish now
+                publishedDate = new Date().toISOString();
             } else if (newStatus === "schedule") {
                 const dateVal = editScheduleDateInput.value;
                 const timeVal = editScheduleTimeInput.value;
@@ -1171,7 +1172,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!getResponse.ok) throw new Error("Could not fetch post for canceling schedule.");
             const postToUpdate = await getResponse.json();
 
-            // Revert to a regular draft by setting IsDraft to true and PublishedDate to null
             postToUpdate.IsDraft = true;
             postToUpdate.PublishedDate = null;
 

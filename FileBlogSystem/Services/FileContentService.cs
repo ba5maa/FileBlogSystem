@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Hosting;
 
 namespace FileBlogSystem.Services
 {
-    public class FileContentService : IContentService
+    public class FileContentService : IFileContentService
     {
         private readonly string _contentRootPath;
         private readonly ILogger<FileContentService> _logger;
@@ -20,7 +20,6 @@ namespace FileBlogSystem.Services
 
         public FileContentService(IWebHostEnvironment env, ILogger<FileContentService> logger)
         {
-            // env.ContentRootPath points to where .csproj is
             _contentRootPath = Path.Combine(env.ContentRootPath, "content");
             _logger = logger;
             _postsFolderPath = Path.Combine(_contentRootPath, "posts");
@@ -52,14 +51,12 @@ namespace FileBlogSystem.Services
                 return null;
             }
         }
-
-        // --- Blog Post Methods ---
-        public async Task<List<BlogPostMeta>> GetAllBlogPostsMetaAsync()
+        public async Task<List<BlogPostMetaResponse>> GetAllBlogPostsMetaAsync()
         {
-            var postsMeta = new List<BlogPostMeta>();
+            var postsMeta = new List<BlogPostMetaResponse>();
             var postsDirectory = Path.Combine(_contentRootPath, "posts");
             var now = DateTime.UtcNow;
-            var jsonOptions = new JsonSerializerOptions { WriteIndented = true }; // For saving meta.json
+            var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
 
 
             if (!Directory.Exists(postsDirectory))
@@ -71,7 +68,7 @@ namespace FileBlogSystem.Services
             foreach (var postFolder in Directory.EnumerateDirectories(postsDirectory))
             {
                 var metaFilePath = Path.Combine(postFolder, "meta.json");
-                var meta = await ReadJsonFileAsync<BlogPostMeta>(metaFilePath);
+                var meta = await ReadJsonFileAsync<BlogPostMetaResponse>(metaFilePath);
 
                 if (meta != null)
                 {
@@ -84,7 +81,7 @@ namespace FileBlogSystem.Services
 
                     if (meta.IsDraft && meta.ScheduledFor.HasValue && meta.ScheduledFor.Value <= DateTime.UtcNow)
                     {
-                        _logger.LogInformation($"Auto-publishing post '{meta.Title}' (slug: {meta.Slug}). Scheduled date has passed.");
+                        _logger.LogInformation($"Auto publishing post '{meta.Title}' (slug: {meta.Slug}). Scheduled date has passed.");
                         meta.IsDraft = false; 
                         meta.ScheduledFor = null;
                         meta.PublishedDate = DateTime.UtcNow;
@@ -97,7 +94,7 @@ namespace FileBlogSystem.Services
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, $"Error auto-publishing and saving meta for post '{meta.Title}'.");
+                            _logger.LogError(ex, $"Error auto publishing and saving meta for post '{meta.Title}'.");
                         }
                     }
 
@@ -108,13 +105,13 @@ namespace FileBlogSystem.Services
             return postsMeta.OrderByDescending(p => p.PublishedDate.HasValue ? p.PublishedDate.Value : DateTime.MinValue).ToList();
         }
 
-        public async Task<BlogPostMeta?> GetBlogPostMetaBySlugAsync(string slug)
+        public async Task<BlogPostMetaResponse?> GetBlogPostMetaBySlugAsync(string slug)
         {
             var allPosts = await GetAllBlogPostsMetaAsync();
             return allPosts.FirstOrDefault(p => p.Slug?.Equals(slug, StringComparison.OrdinalIgnoreCase) == true);
         }
 
-        public async Task<BlogPostMeta?> GetBlogPostMetaByIdAsync(Guid id)
+        public async Task<BlogPostMetaResponse?> GetBlogPostMetaByIdAsync(Guid id)
         {
             var allPosts = await GetAllBlogPostsMetaAsync();
             return allPosts.FirstOrDefault(p => p.Id == id);
@@ -138,11 +135,9 @@ namespace FileBlogSystem.Services
                 return null;
             }
         }
-
-        // --- Category Methods ---
-        public async Task<List<Category>> GetAllCategoriesAsync()
+        public async Task<List<CategoryResponse>> GetAllCategoriesAsync()
         {
-            var categories = new List<Category>();
+            var categories = new List<CategoryResponse>();
             try
             {
                 if (!Directory.Exists(_categoriesFolderPath))
@@ -155,7 +150,7 @@ namespace FileBlogSystem.Services
 
                 foreach (var filePath in categoryFiles)
                 {
-                    var category = await ReadJsonFileAsync<Category>(filePath);
+                    var category = await ReadJsonFileAsync<CategoryResponse>(filePath);
                     if (category != null)
                     {
                         categories.Add(category);
@@ -169,10 +164,9 @@ namespace FileBlogSystem.Services
             return categories.OrderBy(c => c.Name).ToList();
         }
 
-        // --- Tag Methods ---
-        public async Task<List<Tag>> GetAllTagsAsync()
+        public async Task<List<TagResponse>> GetAllTagsAsync()
         {
-            var tags = new List<Tag>();
+            var tags = new List<TagResponse>();
             try
             {
                 if (!Directory.Exists(_tagsFolderPath))
@@ -185,7 +179,7 @@ namespace FileBlogSystem.Services
 
                 foreach (var filePath in tagFiles)
                 {
-                    var tag = await ReadJsonFileAsync<Tag>(filePath);
+                    var tag = await ReadJsonFileAsync<TagResponse>(filePath);
                     if (tag != null)
                     {
                         tags.Add(tag);
@@ -199,8 +193,7 @@ namespace FileBlogSystem.Services
             return tags.OrderBy(t => t.Name).ToList();
         }
 
-        // --- GET User Method ---
-        public async Task<User?> GetUserByUsernameAsync(string username)
+        public async Task<UserResponse?> GetUserByUsernameAsync(string username)
         {
             try
             {
@@ -209,7 +202,7 @@ namespace FileBlogSystem.Services
 
                 if (File.Exists(profileFilePath))
                 {
-                    var user = await ReadJsonFileAsync<User>(profileFilePath);
+                    var user = await ReadJsonFileAsync<UserResponse>(profileFilePath);
                     return user;
                 }
             }
@@ -220,8 +213,7 @@ namespace FileBlogSystem.Services
             return null;
         }
 
-        // --- Write Method for Blog Posts ---
-        public async Task<BlogPostMeta?> CreateBlogPostAsync(CreateBlogPostRequest request)
+        public async Task<BlogPostMetaResponse?> CreateBlogPostAsync(CreateBlogPostRequest request)
         {
             try
             {
@@ -243,8 +235,9 @@ namespace FileBlogSystem.Services
                 Directory.CreateDirectory(postFolderPath);
 
                 var now = DateTime.UtcNow;
-                var newPostMeta = new BlogPostMeta
+                var newPostMeta = new BlogPostMetaResponse
                 {
+                    Id = Guid.NewGuid(),
                     Title = request.Title,
                     Description = request.Description,
                     PublishedDate = request.IsDraft ? null : request.PublishedDate,
@@ -319,8 +312,6 @@ namespace FileBlogSystem.Services
             }
         }
 
-
-        // --- Helper method for slug generation ---
         private string GenerateSlug(string title)
         {
             var slug = title.ToLowerInvariant();
@@ -330,14 +321,13 @@ namespace FileBlogSystem.Services
             return slug;
         }
 
-        // --- New Write Method for Update ---
-        public async Task<BlogPostMeta?> UpdateBlogPostAsync(string originalSlug, UpdateBlogPostRequest request)
+        public async Task<BlogPostMetaResponse?> UpdateBlogPostAsync(string originalSlug, UpdateBlogPostRequest request)
         {
             var existingPostMeta = await GetBlogPostMetaBySlugAsync(originalSlug);
             if (existingPostMeta == null || string.IsNullOrEmpty(existingPostMeta.PostFolderPath))
             {
-                _logger.LogWarning($"Attempted to update non-existent or pathless post with slug: {originalSlug}");
-                return null; // Post not found
+                _logger.LogWarning($"Attempted to update non existent or pathless post with slug: {originalSlug}");
+                return null;
             }
 
             var newBaseSlug = !string.IsNullOrEmpty(request.CustomUrl)
@@ -460,13 +450,12 @@ namespace FileBlogSystem.Services
             }
         }
 
-        // --- Write Method for Delete Post ---
         public async Task<bool> DeleteBlogPostAsync(string slug)
         {
             var postMeta = await GetBlogPostMetaBySlugAsync(slug);
             if (postMeta == null || string.IsNullOrEmpty(postMeta.PostFolderPath))
             {
-                _logger.LogWarning($"Attempted to delete non-existent or pathless post with slug: {slug}");
+                _logger.LogWarning($"Attempted to delete non existent or pathless post with slug: {slug}");
                 return false;
             }
 
@@ -483,9 +472,7 @@ namespace FileBlogSystem.Services
             }
         }
 
-        // --- CRUD Methods for Categories ---
-
-        public async Task<Category?> CreateCategoryAsync(CreateCategoryRequest request)
+        public async Task<CategoryResponse?> CreateCategoryAsync(CreateCategoryRequest request)
         {
             try
             {
@@ -499,7 +486,7 @@ namespace FileBlogSystem.Services
                     return null;
                 }
 
-                var newCategory = new Category
+                var newCategory = new CategoryResponse
                 {
                     Name = categoryName,
                     Slug = categorySlug,
@@ -520,7 +507,7 @@ namespace FileBlogSystem.Services
             }
         }
 
-        public async Task<Category?> UpdateCategoryAsync(string oldName, UpdateCategoryRequest request)
+        public async Task<CategoryResponse?> UpdateCategoryAsync(string oldName, UpdateCategoryRequest request)
         {
             try
             {
@@ -592,7 +579,7 @@ namespace FileBlogSystem.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Catch-all error updating category from '{oldName}' to '{request.NewName}'.");
+                _logger.LogError(ex, $"Catch all error updating category from '{oldName}' to '{request.NewName}'.");
                 return null;
             }
         }
@@ -631,8 +618,7 @@ namespace FileBlogSystem.Services
             }
         }
 
-        // --- CRUD Methods for Tags ---
-        public async Task<Tag?> CreateTagAsync(CreateTagRequest request)
+        public async Task<TagResponse?> CreateTagAsync(CreateTagRequest request)
         {
             try
             {
@@ -646,7 +632,7 @@ namespace FileBlogSystem.Services
                     return null;
                 }
 
-                var newTag = new Tag
+                var newTag = new TagResponse
                 {
                     Name = tagName,
                     Slug = tagSlug
@@ -666,7 +652,7 @@ namespace FileBlogSystem.Services
             }
         }
 
-        public async Task<Tag?> UpdateTagAsync(string oldName, UpdateTagRequest request)
+        public async Task<TagResponse?> UpdateTagAsync(string oldName, UpdateTagRequest request)
         {
             try
             {
@@ -775,10 +761,9 @@ namespace FileBlogSystem.Services
             }
         }
 
-        // ---User Profile Methods ---
-        public async Task<List<User>> GetAllUsersAsync()
+        public async Task<List<UserResponse>> GetAllUsersAsync()
         {
-            var users = new List<User>();
+            var users = new List<UserResponse>();
             try
             {
                 if (!Directory.Exists(_usersFolderPath))
@@ -794,7 +779,7 @@ namespace FileBlogSystem.Services
                     var profileFilePath = Path.Combine(userDirPath, "profile.json");
                     if (File.Exists(profileFilePath))
                     {
-                        var user = await ReadJsonFileAsync<User>(profileFilePath);
+                        var user = await ReadJsonFileAsync<UserResponse>(profileFilePath);
                         if (user != null)
                         {
                             users.Add(user);
@@ -809,7 +794,7 @@ namespace FileBlogSystem.Services
             return users.OrderBy(u => u.Username).ToList(); 
         }
 
-        public async Task<User?> CreateUserAsync(CreateUserRequest request)
+        public async Task<UserResponse?> CreateUserAsync(CreateUserRequest request)
         {
             try
             {
@@ -825,7 +810,7 @@ namespace FileBlogSystem.Services
 
                 Directory.CreateDirectory(userDir);
                  string hashedPassword = PasswordHasher.HashPassword(request.Password);
-                var newUser = new User
+                var newUser = new UserResponse
                 {
                     Username = username,
                     Email = request.Email.Trim(),
@@ -847,7 +832,7 @@ namespace FileBlogSystem.Services
             }
         }
 
-        public async Task<User?> UpdateUserAsync(string username, UpdateUserRequest request)
+        public async Task<UserResponse?> UpdateUserAsync(string username, UpdateUserRequest request)
         {
             try
             {
@@ -863,7 +848,7 @@ namespace FileBlogSystem.Services
                     return null;
                 }
 
-                var existingUser = await ReadJsonFileAsync<User>(profileFilePath);
+                var existingUser = await ReadJsonFileAsync<UserResponse>(profileFilePath);
                 if (existingUser == null)
                 {
                     _logger.LogError($"Could not deserialize existing user profile for '{userToUpdateUsername}'.");
