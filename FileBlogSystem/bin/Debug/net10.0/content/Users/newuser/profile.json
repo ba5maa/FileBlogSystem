@@ -1,8 +1,0 @@
-{
-  "Username": "newuser",
-  "Email": "newuser@example",
-  "Roles": [
-    "Author"
-  ],
-  "HashedPassword": "$2a$10$NSBrqPhlVNlJopLUSTdtgu59ilVbYbgLyZNuK9YO9V/xtfghmqDom"
-}
