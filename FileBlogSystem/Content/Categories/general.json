@@ -1,5 +1,6 @@
 {
-  "Name": "General",
+  "Id": "69a9f441-4338-4b10-a146-5ba7a8158d00",
+  "Name": "general",
   "Slug": "general",
-  "Description": "General blog posts"
+  "Description": "string"
 }

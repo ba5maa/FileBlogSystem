@@ -13,11 +13,11 @@ namespace FileBlogSystem.Services
         Task<BlogPostMetaResponse?> UpdateBlogPostAsync(string originalSlug, UpdateBlogPostRequest request);
         Task<bool> DeleteBlogPostAsync(string slug);
         Task<CategoryResponse?> CreateCategoryAsync(CreateCategoryRequest request);
-        Task<CategoryResponse?> UpdateCategoryAsync(string oldName, UpdateCategoryRequest request);
-        Task<bool> DeleteCategoryAsync(string name);
+        Task<CategoryResponse?> UpdateCategoryAsync(Guid id, UpdateCategoryRequest request);
+        Task<bool> DeleteCategoryAsync(Guid id);
         Task<TagResponse?> CreateTagAsync(CreateTagRequest request);
-        Task<TagResponse?> UpdateTagAsync(string oldName, UpdateTagRequest request);
-        Task<bool> DeleteTagAsync(string name);
+        Task<TagResponse?> UpdateTagAsync(Guid id, UpdateTagRequest request);
+        Task<bool> DeleteTagAsync(Guid id);
         Task<List<UserResponse>> GetAllUsersAsync();
         Task<UserResponse?> CreateUserAsync(CreateUserRequest request);
         Task<UserResponse?> UpdateUserAsync(string username, UpdateUserRequest request);

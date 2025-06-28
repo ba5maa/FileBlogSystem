@@ -17,8 +17,8 @@ namespace FileBlogSystem.Models
         [Required]
         public string Content { get; set; } = string.Empty;
 
-        public List<string> Tags { get; set; } = new List<string>();
-        public List<string> Categories { get; set; } = new List<string>();
+        public List<Guid> Tags { get; set; } = new List<Guid>();
+        public List<Guid> Categories { get; set; } = new List<Guid>();
 
         public string? CustomUrl { get; set; }
         public bool IsDraft { get; set; }

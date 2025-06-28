@@ -1,0 +1,19 @@
+{
+  "Id": "302dd3c2-ea94-4f5a-9a31-15e9a421cb1a",
+  "Title": "cat pic",
+  "Description": "",
+  "CreationDate": "0001-01-01T00:00:00",
+  "PublishedDate": "2025-06-28T00:00:00",
+  "ModificationDate": "2025-06-28T15:57:16.9611124Z",
+  "Tags": [
+    "3b53d125-b543-4931-99bd-4d16d3a83fb6"
+  ],
+  "Categories": [],
+  "CustomUrl": null,
+  "Slug": "cat-pic",
+  "isDraft": false,
+  "Content": "",
+  "ImageUrl": null,
+  "AuthorUsername": "admin",
+  "ScheduledFor": null
+}

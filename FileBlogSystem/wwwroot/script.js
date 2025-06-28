@@ -90,7 +90,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (categoriesRes.ok) {
                 const categoriesData = await categoriesRes.json();
-                CATEGORIES = categoriesData.map(cat => cat.name); 
+                CATEGORIES = categoriesData; 
             } else {
                 console.warn('Could not fetch categories. Using empty array.', await categoriesRes.text());
                 CATEGORIES = [];
@@ -98,7 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (tagsRes.ok) {
                 const tagsData = await tagsRes.json();
-                TAGS = tagsData.map(tag => tag.name); 
+                TAGS = tagsData;
             } else {
                 console.warn('Could not fetch tags. Using empty array.', await tagsRes.text());
                 TAGS = [];
@@ -295,7 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="filter-container">
                         <select id="tag-filter">
                             <option value="">All Tags</option>
-                            ${TAGS.map((tag) => `<option value="${tag}">${tag}</option>`).join("")}
+                            ${TAGS.map((tag) => `<option value="${tag.id}">${getTagNameById(tag.id)}</option>`).join("")}
                         </select>
                     </div>
                 </div>
@@ -312,7 +312,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 <label for="post-category">Category</label>
                                 <select id="post-category" required>
                                     <option value="">Select Category</option>
-                                    ${CATEGORIES.map((cat) => `<option value="${cat}">${cat}</option>`).join("")}
+                                    ${CATEGORIES.map((cat) => `<option value="${cat.id}">${getCategoryNameById(cat.id)}</option>`).join("")}
                                 </select>
                             </div>
                         </div>
@@ -326,7 +326,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <div class="form-group flex-2">
                                 <label for="post-tags">Tags</label>
                                 <select id="post-tags" multiple>
-                                    ${TAGS.map((tag) => `<option value="${tag}">${tag}</option>`).join("")}
+                                    ${TAGS.map((tag) => `<option value="${tag.id}">${getTagNameById(tag.id)}</option>`).join("")}
                                 </select>
                                 <small>Hold Ctrl/Cmd to select multiple tags</small>
                             </div>
@@ -416,11 +416,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 (option) => option.value,
             );
 
+            const selectedCategoryId = document.getElementById("post-category").value;
+
             const status = document.getElementById("post-status").value;
             let publishedDate = null;
             
             if (status === "publish") {
-                publishedDate = new Date().toISOString(); // Publish now
+                publishedDate = new Date().toISOString();
             } else if (status === "schedule") {
                 const dateVal = scheduleDateInput.value;
                 const timeVal = scheduleTimeInput.value;
@@ -430,7 +432,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     return;
                 }
 
-                const scheduledDateTime = new Date(`${dateVal}T${timeVal}:00`); // Assuming time is HH:MM
+                const scheduledDateTime = new Date(`${dateVal}T${timeVal}:00`);
                 const now = new Date();
 
                 if (scheduledDateTime <= now) {
@@ -444,7 +446,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 title: document.getElementById("post-title").value,
                 AuthorUsername: user.username, 
                 content: document.getElementById("post-content").value,
-                category: document.getElementById("post-category").value,
+                category: selectedCategoryId ? [selectedCategoryId] : [],
                 tags: selectedTags,
                 isDraft: status === "draft" || (status === "schedule" && new Date(publishedDate) > new Date()),
                 publishedDate: publishedDate,
@@ -538,6 +540,16 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
+    function getTagNameById(id) {
+        const tag = TAGS.find(t => t.id === id);
+        return tag ? tag.name : id;
+    }
+    
+    function getCategoryNameById(id) {
+        const cat = CATEGORIES.find(c => c.id === id);
+        return cat ? cat.name : id;
+    }
+
     async function loadPosts() {
         const postsContainer = document.getElementById("posts-container");
         const postsCount = document.getElementById("posts-count");
@@ -561,7 +573,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const queryParams = new URLSearchParams();
         if (searchTerm) {
             queryParams.append('searchTerm', searchTerm);
-            queryParams.append('AuthorUsername', searchTerm);
+            //queryParams.append('AuthorUsername', searchTerm);
         }
         if (selectedTag) {
             queryParams.append('tag', selectedTag);
@@ -572,7 +584,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             const headers = isAuthenticated() ? { 'Authorization': `Bearer ${token}` } : {};
-            const response = await fetchAuthenticated(`/api/posts?searchTerm=${encodeURIComponent(searchTerm)}`);
+            const response = await fetchAuthenticated(url, { headers });
 
             if (!response.ok) {
                 const errorData = response.headers.get('Content-Type')?.includes('application/json') ? await response.json() : await response.text();
@@ -621,9 +633,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="post-body">
                         <h3 class="post-title">${post.title}</h3>
                         <div class="post-meta">
-                            <span class="post-category"><i class="fas fa-folder"></i> ${post.categories || 'Uncategorized'}</span>
+                            <span class="post-category"><i class="fas fa-folder"></i> 
+                              ${Array.isArray(post.categories) ? post.categories.map(getCategoryNameById).join(', ') : 'Uncategorized'}
+                            </span>
                             <div class="post-tags">
-                                ${post.tags && post.tags.length > 0 ? post.tags.map((tag) => `<span class="tag"><i class="fas fa-tag"></i> ${tag}</span>`).join("") : ''}
+                                ${post.tags && post.tags.length > 0 ? post.tags.map((tag) => `<span class="tag"><i class="fas fa-tag"></i> ${getTagNameById(tag)}</span>`).join("") : ''}
                             </div>
                         </div>
                         <p class="post-content">${post.content.substring(0, 200)}</p>
@@ -784,9 +798,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         <h3>${draft.title}</h3>
                         <p>${draft.content.substring(0, 150)}${draft.content.length > 150 ? '...' : ''}</p>
                         <div class="draft-meta">
-                            <span class="draft-category">${draft.categories || 'Uncategorized'}</span>
+                            <span class="draft-category">${Array.isArray(draft.categories) ? draft.categories.map(getCategoryNameById).join(', ') : 'Uncategorized'}</span>
                             <div class="draft-tags">
-                                ${draft.tags && draft.tags.length > 0 ? draft.tags.map((tag) => `<span class="tag">${tag}</span>`).join("") : ''}
+                                ${draft.tags && draft.tags.length > 0 ? draft.tags.map((tag) => `<span class="tag">${getTagNameById(tag)}</span>`).join("") : ''}
                             </div>
                         </div>
                         ${draft.imageUrl ? `<img src="${API_BASE_URL}${draft.imageUrl}" alt="${draft.title}" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px;">` : ""}
@@ -860,10 +874,14 @@ document.addEventListener("DOMContentLoaded", () => {
        let publishedDateValue = '';
         let publishedTimeValue = '';
         postData.publishedDate = getMinDate();
+        postData.ImageUrl = postData.ImageUrl || null;
+        postData.Base64Image = postData.Base64Image || null;
+        postData.isDraft = postData.isDraft || false;
+
         if (postData.publishedDate) {
             const dateObj = new Date(postData.publishedDate);
-            publishedDateValue = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
-            publishedTimeValue = dateObj.toTimeString().substring(0, 5); // HH:MM
+            publishedDateValue = dateObj.toISOString().split('T')[0]; 
+            publishedTimeValue = dateObj.toTimeString().substring(0, 5);
         }
 
         appContainer.innerHTML = `
@@ -880,7 +898,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <label for="edit-post-category">Category</label>
                             <select id="edit-post-category" required>
                                 <option value="">Select Category</option>
-                                ${CATEGORIES.map((cat) => `<option value="${cat}" ${postData.category === cat ? 'selected' : ''}>${cat}</option>`).join("")}
+                                ${CATEGORIES.map((cat) => `<option value="${cat.id}" ${postData.category === cat.id ? 'selected' : ''}>${getCategoryNameById(cat.id)}</option>`).join("")}
                             </select>
                         </div>
                     </div>
@@ -894,7 +912,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="form-group flex-2">
                             <label for="edit-post-tags">Tags</label>
                             <select id="edit-post-tags" multiple>
-                                ${TAGS.map((tag) => `<option value="${tag}" ${postData.tags && postData.tags.includes(tag) ? 'selected' : ''}>${tag}</option>`).join("")}
+                                ${TAGS.map((tag) => `<option value="${tag.id}" ${postData.tags && postData.tags.includes(tag.id) ? 'selected' : ''}>${getTagNameById(tag.id)}</option>`).join("")}
                             </select>
                             <small>Hold Ctrl/Cmd to select multiple tags</small>
                         </div>
@@ -1019,7 +1037,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 title: document.getElementById("edit-post-title").value,
                 AuthorUsername: user.username,
                 content: document.getElementById("edit-post-content").value,
-                category: document.getElementById("edit-post-category").value,
+                category: [document.getElementById("edit-post-category").value],
                 tags: selectedTags,
                 isDraft: newStatus === "draft" || newStatus === "schedule",
                 publishedDate: publishedDate,
@@ -1085,6 +1103,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             draftToPublish.isDraft = false;
             draftToPublish.publishedDate = new Date().toISOString();
+            draftToPublish.selectedTags = draftToPublish.tags || [];
+            draftToPublish.selectedCategoryId = draftToPublish.category && draftToPublish.category.length > 0 ? draftToPublish.category[0] : null;
+            draftToPublish.imageUrl = draftToPublish.ImageUrl || null;
 
             const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}`, {
                 method: 'PUT',

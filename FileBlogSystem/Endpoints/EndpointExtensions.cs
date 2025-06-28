@@ -50,17 +50,16 @@ namespace FileBlogSystem.Endpoints
                         p.AuthorUsername.ToLowerInvariant().Contains(lowerSearchTerm));
                 }
 
-                if (!string.IsNullOrEmpty(tag))
+                if (!string.IsNullOrEmpty(tag) && Guid.TryParse(tag, out Guid tagId))
                 {
-                    var lowerTag = tag.ToLowerInvariant();
-                    filteredPosts = filteredPosts.Where(p => p.Tags != null && p.Tags.Any(t => t.ToLowerInvariant() == lowerTag));
+                    filteredPosts = filteredPosts.Where(p => p.Tags != null && p.Tags.Contains(tagId));
                 }
 
-                if (!string.IsNullOrEmpty(category))
-                {
-                    var lowerCategory = category.ToLowerInvariant();
-                    filteredPosts = filteredPosts.Where(p => p.Categories != null && p.Categories.Any(c => c.ToLowerInvariant() == lowerCategory));
-                }
+                // if (!string.IsNullOrEmpty(category))
+                // {
+                //     var lowerCategory = category.ToLowerInvariant();
+                //     filteredPosts = filteredPosts.Where(p => p.Categories != null && p.Categories.Any(c => c.ToLowerInvariant() == lowerCategory));
+                // }
 
                 foreach (var meta in filteredPosts)
                 {
@@ -134,6 +133,19 @@ namespace FileBlogSystem.Endpoints
             .WithName("GetAllCategories")
             .Produces<List<CategoryResponse>>(StatusCodes.Status200OK);
 
+            app.MapGet("/api/categories/{id:guid}", async (Guid id, IFileContentService contentService) =>
+            {
+                var categories = await contentService.GetAllCategoriesAsync();
+                var category = categories.FirstOrDefault(c => c.Id == id);
+                if (category == null)
+                {
+                    return Results.NotFound($"category-with-id-'{id}'-not-found");
+                }
+                return Results.Ok(category);
+            })
+            .WithName("GetCategoryById")
+            .WithOpenApi();
+
             app.MapGet("/api/tags", async (IFileContentService contentService) =>
             {
                 var tags = await contentService.GetAllTagsAsync();
@@ -141,6 +153,19 @@ namespace FileBlogSystem.Endpoints
             })
             .WithName("GetAllTags")
             .Produces<List<TagResponse>>(StatusCodes.Status200OK);
+
+            app.MapGet("/api/tags/{id:guid}", async (Guid id, IFileContentService contentService) => // Change to Guid id
+            {
+                var tags = await contentService.GetAllTagsAsync();
+                var tag = tags.FirstOrDefault(t => t.Id == id);
+                if (tag == null)
+                {
+                    return Results.NotFound($"tag-with-id-'{id}'-not-found");
+                }
+                return Results.Ok(tag);
+            })
+            .WithName("GetTagById")
+            .WithOpenApi();
 
             app.MapGet("/api/users/{username}", async (string username, IFileContentService contentService) =>
             {
@@ -359,7 +384,7 @@ namespace FileBlogSystem.Endpoints
             .Produces(StatusCodes.Status500InternalServerError)
             .Accepts<CreateCategoryRequest>("application/json");
 
-            app.MapPut("/api/categories/{oldName}", async (string oldName, UpdateCategoryRequest request, IFileContentService contentService, ClaimsPrincipal user) =>
+            app.MapPut("/api/categories", async ( UpdateCategoryRequest request, IFileContentService contentService, ClaimsPrincipal user) =>
             {
                 if (!user.IsInRole("Admin") && !user.IsInRole("Author"))
                 {
@@ -371,7 +396,7 @@ namespace FileBlogSystem.Endpoints
                     return Results.BadRequest("new-category-name-cannot-be-empty");
                 }
 
-                var updatedCategory = await contentService.UpdateCategoryAsync(oldName, request);
+                var updatedCategory = await contentService.UpdateCategoryAsync(request.Id, request);
 
                 if (updatedCategory == null)
                 {
@@ -380,7 +405,7 @@ namespace FileBlogSystem.Endpoints
                     {
                         return Results.Conflict($"category-with-new-name-'{request.NewName}'-already-exists");
                     }
-                    return Results.NotFound($"category-'{oldName}'-not-found-or-could-not-be-updated");
+                    return Results.NotFound($"category-'{request.Id}'-not-found-or-could-not-be-updated");
                 }
 
                 return Results.Ok(updatedCategory);
@@ -396,18 +421,18 @@ namespace FileBlogSystem.Endpoints
             .Produces(StatusCodes.Status500InternalServerError)
             .Accepts<UpdateCategoryRequest>("application/json");
 
-            app.MapDelete("/api/categories/{name}", async (string name, IFileContentService contentService, ClaimsPrincipal user) =>
+            app.MapDelete("/api/categories/{id:guid}", async (Guid id, IFileContentService contentService, ClaimsPrincipal user) =>
             {
                 if (!user.IsInRole("Admin"))
                 {
                     return Results.Forbid();
                 }
 
-                var deleted = await contentService.DeleteCategoryAsync(name);
+                var deleted = await contentService.DeleteCategoryAsync(id);
 
                 if (!deleted)
                 {
-                    return Results.NotFound($"category-'{name}'-not-found-or-could-not-be-deleted");
+                    return Results.NotFound($"category-'{id}'-not-found-or-could-not-be-deleted");
                 }
 
                 return Results.NoContent();
@@ -434,12 +459,12 @@ namespace FileBlogSystem.Endpoints
             .WithName("CreateTag")
             .WithOpenApi();
 
-            app.MapPut("/api/tags/{oldName}", async (string oldName, UpdateTagRequest request, IFileContentService contentService) =>
+            app.MapPut("/api/tags", async ( UpdateTagRequest request, IFileContentService contentService) =>
             {
-                var updatedTag = await contentService.UpdateTagAsync(oldName, request);
+                var updatedTag = await contentService.UpdateTagAsync(request.Id, request);
                 if (updatedTag == null)
                 {
-                    return Results.NotFound($"tag-'{oldName}'-not-found-or-could-not-be-updated");
+                    return Results.NotFound($"tag-'{request.Id}'-not-found-or-could-not-be-updated");
                 }
                 return Results.Ok(updatedTag);
             })
@@ -447,12 +472,12 @@ namespace FileBlogSystem.Endpoints
             .WithName("UpdateTag")
             .WithOpenApi();
 
-            app.MapDelete("/api/tags/{name}", async (string name, IFileContentService contentService) =>
+            app.MapDelete("/api/tags/{id:guid}", async (Guid id, IFileContentService contentService) =>
             {
-                var success = await contentService.DeleteTagAsync(name);
+                var success = await contentService.DeleteTagAsync(id);
                 if (!success)
                 {
-                    return Results.NotFound($"tag-'{name}'-not-found-or-could-not-be-deleted");
+                    return Results.NotFound($"tag-'{id}'-not-found-or-could-not-be-deleted");
                 }
                 return Results.NoContent();
             })
