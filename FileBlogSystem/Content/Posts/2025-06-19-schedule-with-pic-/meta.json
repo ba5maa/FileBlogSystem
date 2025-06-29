@@ -3,15 +3,17 @@
   "Title": "schedule with pic ",
   "Description": "",
   "CreationDate": "2025-06-19T22:19:17.1936914Z",
-  "PublishedDate": "2025-06-19T22:20:15.615865Z",
-  "ModificationDate": "2025-06-19T22:20:15.6035333Z",
+  "PublishedDate": "2025-06-29T00:00:00",
+  "ModificationDate": "2025-06-29T15:15:26.4226245Z",
   "Tags": [],
-  "Categories": [],
+  "Categories": [
+    "69a9f441-4338-4b10-a146-5ba7a8158d00"
+  ],
   "CustomUrl": null,
   "Slug": "schedule-with-pic-",
   "isDraft": false,
   "Content": "",
-  "ImageUrl": "/content/posts/2025-06-19-schedule-with-pic-/assets/a7f5ef1b-85b2-409f-b5a1-a3e927e70083.jpeg",
+  "ImageUrl": "/content/posts/2025-06-19-schedule-with-pic-/assets/46382957-2201-4f90-83c5-ba6f69a03758.jpeg",
   "AuthorUsername": "admin",
   "ScheduledFor": null
 }

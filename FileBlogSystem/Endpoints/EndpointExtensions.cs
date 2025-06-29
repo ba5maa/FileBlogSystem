@@ -79,7 +79,8 @@ namespace FileBlogSystem.Endpoints
                         meta.AuthorUsername,
                         meta.IsDraft,
                         meta.ImageUrl,
-                        Content = content ?? ""
+                        Content = content ?? "",
+                        meta.ScheduledFor
                     });
                 }
                 return Results.Ok(posts);

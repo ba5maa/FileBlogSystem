@@ -446,7 +446,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 title: document.getElementById("post-title").value,
                 AuthorUsername: user.username, 
                 content: document.getElementById("post-content").value,
-                category: selectedCategoryId ? [selectedCategoryId] : [],
+                categories: selectedCategoryId ? [selectedCategoryId] : [],
                 tags: selectedTags,
                 isDraft: status === "draft" || (status === "schedule" && new Date(publishedDate) > new Date()),
                 publishedDate: publishedDate,
@@ -791,8 +791,14 @@ document.addEventListener("DOMContentLoaded", () => {
                             <span class="draft-date">Last modified: ${formatDate(draft.modificationDate || draft.createdAt)}</span>
                         </div>
                         <div class="post-status">
-                            ${draft.isDraft ? '<span class="draft-badge"><i class="fas fa-edit"></i> Draft</span>' : '<span class="published-badge"><i class="fas fa-check-circle"></i> Published</span>'}
-                        </div>
+                         ${
+                           draft.isDraft && draft.scheduledFor
+                             ? '<span class="scheduled-badge"><i class="fas fa-clock"></i> Scheduled</span>'
+                             : draft.isDraft
+                               ? '<span class="draft-badge"><i class="fas fa-edit"></i> Draft</span>'
+                               : '<span class="published-badge"><i class="fas fa-check-circle"></i> Published</span>'
+                         }
+                       </div>
                     </div>
                     <div class="draft-content">
                         <h3>${draft.title}</h3>
@@ -877,6 +883,8 @@ document.addEventListener("DOMContentLoaded", () => {
         postData.ImageUrl = postData.ImageUrl || null;
         postData.Base64Image = postData.Base64Image || null;
         postData.isDraft = postData.isDraft || false;
+        postData.categories = postData.categories || [];
+        postData.scheduledFor = postData.scheduledFor || null;
 
         if (postData.publishedDate) {
             const dateObj = new Date(postData.publishedDate);
@@ -898,7 +906,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <label for="edit-post-category">Category</label>
                             <select id="edit-post-category" required>
                                 <option value="">Select Category</option>
-                                ${CATEGORIES.map((cat) => `<option value="${cat.id}" ${postData.category === cat.id ? 'selected' : ''}>${getCategoryNameById(cat.id)}</option>`).join("")}
+                                    ${CATEGORIES.map((cat) => `<option value="${cat.id}" ${postData.categories?.includes(cat.id) ? 'selected' : ''}>${getCategoryNameById(cat.id)}</option>`).join("")}
                             </select>
                         </div>
                     </div>
@@ -919,7 +927,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="form-group">
                             <label for="edit-post-image">Image</label>
                             <input type="file" id="edit-post-image" accept="image/*">
-                             ${postData.ImageUrl ? `<img src="${API_BASE_URL}${postData.ImageUrl}" alt="${postData.title || 'Current Image'}" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px;">
+                             ${postData.imageUrl ? `<img src="${API_BASE_URL}${postData.imageUrl}" alt="${postData.title || 'Current Image'}" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px;">
                                 <button type="button" class="btn btn-sm btn-danger remove-image-btn" style="margin-top: 5px;">Remove Image</button>
                                 ` : ''}                        </div>
                     </div>
@@ -1037,12 +1045,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 title: document.getElementById("edit-post-title").value,
                 AuthorUsername: user.username,
                 content: document.getElementById("edit-post-content").value,
-                category: [document.getElementById("edit-post-category").value],
+                categories: [document.getElementById("edit-post-category").value],
                 tags: selectedTags,
                 isDraft: newStatus === "draft" || newStatus === "schedule",
                 publishedDate: publishedDate,
                 ImageUrl: postData.ImageUrl,
-                Base64Image: null
+                Base64Image: postData.Base64Image || null
             };
 
             if (editPostImageInput.files.length > 0) {

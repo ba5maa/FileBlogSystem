@@ -1,0 +1,19 @@
+{
+  "Id": "4cbd46bd-ac7a-4406-8548-be18ab63a49e",
+  "Title": "trying scheduled badge ",
+  "Description": "",
+  "CreationDate": "0001-01-01T00:00:00",
+  "PublishedDate": null,
+  "ModificationDate": "2025-06-29T15:55:18.9157437Z",
+  "Tags": [],
+  "Categories": [
+    "69a9f441-4338-4b10-a146-5ba7a8158d00"
+  ],
+  "CustomUrl": null,
+  "Slug": "trying-scheduled-badge-",
+  "isDraft": true,
+  "Content": "",
+  "ImageUrl": null,
+  "AuthorUsername": "admin",
+  "ScheduledFor": "2025-06-30T15:55:00Z"
+}
