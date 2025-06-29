@@ -4,9 +4,11 @@
   "Description": "",
   "CreationDate": "2025-06-24T14:42:10.8730951Z",
   "PublishedDate": null,
-  "ModificationDate": "2025-06-24T14:42:10.8729836Z",
+  "ModificationDate": "2025-06-29T21:43:31.797179Z",
   "Tags": [],
-  "Categories": [],
+  "Categories": [
+    "69a9f441-4338-4b10-a146-5ba7a8158d00"
+  ],
   "CustomUrl": null,
   "Slug": "testing-a-new-post-after-programcs",
   "isDraft": true,

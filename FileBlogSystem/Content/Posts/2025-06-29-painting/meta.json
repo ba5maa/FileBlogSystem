@@ -1,0 +1,19 @@
+{
+  "Id": "0b9c26ed-301d-48be-a218-21032f1145cc",
+  "Title": "painting",
+  "Description": "",
+  "CreationDate": "0001-01-01T00:00:00",
+  "PublishedDate": "2025-06-29T17:01:36.389Z",
+  "ModificationDate": "2025-06-29T17:01:36.4199945Z",
+  "Tags": [],
+  "Categories": [
+    "69a9f441-4338-4b10-a146-5ba7a8158d00"
+  ],
+  "CustomUrl": null,
+  "Slug": "painting",
+  "isDraft": false,
+  "Content": "",
+  "ImageUrl": "/content/posts/2025-06-29-painting/assets/b4d24a6f-b324-43c3-8122-be04525aaef3.jpeg",
+  "AuthorUsername": "admin",
+  "ScheduledFor": null
+}

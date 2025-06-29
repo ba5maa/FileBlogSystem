@@ -25,6 +25,7 @@ namespace FileBlogSystem.Models
         public string? ImageUrl { get; set; }
         public string? Base64Image { get; set; }
         public DateTime? PublishedDate { get; set; }
+        public DateTime? ScheduledFor { get; set; }
 
     }
 }

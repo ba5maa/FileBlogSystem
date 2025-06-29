@@ -405,19 +405,20 @@ namespace FileBlogSystem.Services
             existingPostMeta.PostFolderPath = newPostFolderPath;
             existingPostMeta.IsDraft = request.IsDraft;
             existingPostMeta.PublishedDate = request.PublishedDate;
+            existingPostMeta.ScheduledFor = request.ScheduledFor;
 
 
- if (!string.IsNullOrEmpty(request.Base64Image)) 
+ if (!string.IsNullOrEmpty(request.Base64Image))
             {
-                
+
                 if (!string.IsNullOrEmpty(existingPostMeta.ImageUrl))
                 {
                     try
                     {
-                       
+
                         var oldImageRelativePath = existingPostMeta.ImageUrl.Replace("/content/", "").Replace('/', Path.DirectorySeparatorChar);
                         var oldImageFilePath = Path.Combine(_contentRootPath, oldImageRelativePath);
-                        
+
                         if (File.Exists(oldImageFilePath))
                         {
                             File.Delete(oldImageFilePath);
@@ -436,9 +437,9 @@ namespace FileBlogSystem.Services
                     existingPostMeta.ImageUrl = $"/content/posts/{newPostFolderName}/assets/{imageFileName}";
                 }
             }
-            else if (request.ImageUrl == null && existingPostMeta.ImageUrl != null) 
+            else if (request.ImageUrl == null && existingPostMeta.ImageUrl != null)
             {
-                 try
+                try
                 {
                     var oldImageRelativePath = existingPostMeta.ImageUrl.Replace("/content/", "").Replace('/', Path.DirectorySeparatorChar);
                     var oldImageFilePath = Path.Combine(_contentRootPath, oldImageRelativePath);
@@ -765,7 +766,7 @@ namespace FileBlogSystem.Services
                     Username = username,
                     Email = request.Email.Trim(),
                     HashedPassword = hashedPassword,
-                    Roles = request.Roles ?? new List<string>()
+                    Roles = request.Roles ?? ["Author"]
                 };
 
                 var jsonOptions = new JsonSerializerOptions { WriteIndented = true };

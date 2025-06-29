@@ -1,0 +1,21 @@
+{
+  "Id": "191e6de5-dc46-49cc-96e0-8e0c4f95998f",
+  "Title": "hi draft",
+  "Description": "",
+  "CreationDate": "0001-01-01T00:00:00",
+  "PublishedDate": "2025-06-29T21:16:15.966Z",
+  "ModificationDate": "2025-06-29T21:16:16.0496042Z",
+  "Tags": [
+    "3b53d125-b543-4931-99bd-4d16d3a83fb6"
+  ],
+  "Categories": [
+    "69a9f441-4338-4b10-a146-5ba7a8158d00"
+  ],
+  "CustomUrl": null,
+  "Slug": "hi-draft",
+  "isDraft": false,
+  "Content": "",
+  "ImageUrl": null,
+  "AuthorUsername": "admin",
+  "ScheduledFor": null
+}

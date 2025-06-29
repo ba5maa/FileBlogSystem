@@ -133,11 +133,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div id="signup-fields" style="display: ${type === "signup" ? "block" : "none"};">
                             <div class="form-group">
                                 <label for="confirm-password"><i class="fas fa-lock"></i> Confirm Password</label>
-                                <input type="password" id="confirm-password">
+                                <input type="password" id="confirm-password"> 
                             </div>
-                            <div></div>
+                        </div>
+                        <div id="signup-fields" style="display: ${type === "signup" ? "block" : "none"};">
                             <div class="form-group">
-                                <label for="email"><i class="fas fa-envelope"></i> Email</label>
+                                <label for="email"><i class="fas fa-lock"></i> Email</label>
                                 <input type="email" id="email">
                             </div>
                         </div>
@@ -207,6 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const credentials = {
                 username: usernameInput.value,
                 password: passwordInput.value,
+                roles: ["Author"]
             };
 
             let endpoint = '';
@@ -215,7 +217,7 @@ document.addEventListener("DOMContentLoaded", () => {
             } else { 
                 const confirmPasswordInput = document.getElementById("confirm-password");
                 const emailInput = document.getElementById("email");
-                const roleSelect = document.getElementById("role");
+                //const roleSelect = "Author";
 
                 if (credentials.password !== confirmPasswordInput.value) {
                     showMessage("Passwords do not match.", "error", messageElement);
@@ -725,7 +727,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="drafts-page">
                 <div class="page-header">
                     <h2><i class="fas fa-edit"></i> My Drafts & Posts</h2>
-                    <p>Manage your unpublished posts</p>
+                    <p>Manage your posts and drafts</p>
                 </div>
                 
                 <div id="drafts-container" class="drafts-container">
@@ -813,12 +815,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     </div>
                     <div class="draft-actions">
-                        <button class="btn btn-primary edit-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-edit"></i> Edit</button>
-                        ${(draft.isDraft && draft.publishedDate && new Date(draft.publishedDate) > new Date()) ?
-                           `<button class="btn btn-secondary cancel-schedule-btn" data-post-slug="${draft.slug}"><i class="fas fa-ban"></i> Cancel Schedule</button>` :
-                           `<button class="btn btn-success publish-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-paper-plane"></i> Publish Now</button>`
-                        }     
-                        <button class="btn btn-danger delete-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-trash"></i> Delete</button>
+                        <button class="btn btn-primary edit-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-edit"></i>Edit</button>
+                        ${
+                          draft.isDraft
+                            ? (draft.scheduledFor
+                                ? `<button class="btn btn-secondary cancel-schedule-btn" data-post-slug="${draft.slug}"><i class="fas fa-ban"></i>Cancel Schedule</button>`
+                                : `<button class="btn btn-success publish-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-paper-plane"></i>Publish Now</button>`)
+                            : ''
+                        }    
+                        <button class="btn btn-danger delete-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-trash"></i>Delete</button>
                     </div>
                 `;
                 draftsContainer.appendChild(draftCard);
@@ -1201,8 +1206,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!getResponse.ok) throw new Error("Could not fetch post for canceling schedule.");
             const postToUpdate = await getResponse.json();
 
-            postToUpdate.IsDraft = true;
-            postToUpdate.PublishedDate = null;
+            postToUpdate.isDraft = true;
+            postToUpdate.publishedDate = null;
+            postToUpdate.scheduledFor = null;
 
             const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}`, {
                 method: 'PUT',

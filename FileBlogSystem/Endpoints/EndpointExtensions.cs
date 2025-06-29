@@ -505,7 +505,6 @@ namespace FileBlogSystem.Endpoints
                 }
                 return Results.CreatedAtRoute("GetUserByUsername", new { username = user.Username }, user);
             })
-            .RequireAuthorization()
             .WithName("CreateUser")
             .WithOpenApi();
 
