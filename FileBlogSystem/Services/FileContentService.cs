@@ -853,5 +853,64 @@ namespace FileBlogSystem.Services
                 return false;
             }
         }
+        
+        public async Task<bool> SaveUpdatedMetaAsync(BlogPostMetaResponse post)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(post.PostFolderPath)) return false;
+                var metaFilePath = Path.Combine(post.PostFolderPath, "meta.json");
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                var json = JsonSerializer.Serialize(post, options);
+                await File.WriteAllTextAsync(metaFilePath, json);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error saving updated meta for post ID {post.Id}");
+                return false;
+            }
+        }
+
+        public async Task<bool> AddCommentAsync(string slug, CommentModel comment)
+        {
+            var postMeta = await GetBlogPostMetaBySlugAsync(slug);
+            if (postMeta == null || string.IsNullOrEmpty(postMeta.PostFolderPath)) return false;
+        
+            var commentsDir = Path.Combine(postMeta.PostFolderPath, "comments");
+            Directory.CreateDirectory(commentsDir);
+        
+            comment.Id = Guid.NewGuid();
+            comment.CreatedAt = DateTime.UtcNow;
+
+            var commentPath = Path.Combine(commentsDir, $"{comment.Id}.json");
+            var json = JsonSerializer.Serialize(comment, new JsonSerializerOptions { WriteIndented = true });
+        
+            await File.WriteAllTextAsync(commentPath, json);
+            return true;
+        }
+        
+       public async Task<List<CommentModel>> GetCommentsAsync(string slug)
+        {
+            var postMeta = await GetBlogPostMetaBySlugAsync(slug);
+            var comments = new List<CommentModel>();
+        
+            if (postMeta == null || string.IsNullOrEmpty(postMeta.PostFolderPath)) return comments;
+        
+            var commentsDir = Path.Combine(postMeta.PostFolderPath, "comments");
+            if (!Directory.Exists(commentsDir)) return comments;
+        
+            foreach (var file in Directory.GetFiles(commentsDir, "*.json"))
+            {
+                var comment = await ReadJsonFileAsync<CommentModel>(file);
+                if (comment != null) comments.Add(comment);
+            }
+        
+            return comments.OrderByDescending(c => c.CreatedAt).ToList();
+        }
+        
+        
+        
     }
+
 }

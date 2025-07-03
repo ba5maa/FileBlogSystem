@@ -34,5 +34,6 @@ namespace FileBlogSystem.Models
         public string? ImageUrl { get; set; }
         public string AuthorUsername { get; set; } = string.Empty;
         public DateTime? ScheduledFor { get; set; }
+        public List<string> LikedByUsers { get; set; } = new List<string>();
     }
 }

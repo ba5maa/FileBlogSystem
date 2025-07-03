@@ -80,7 +80,9 @@ namespace FileBlogSystem.Endpoints
                         meta.IsDraft,
                         meta.ImageUrl,
                         Content = content ?? "",
-                        meta.ScheduledFor
+                        meta.ScheduledFor,
+                        meta.LikedByUsers,
+                        LikeCount = meta.LikedByUsers?.Count ?? 0
                     });
                 }
                 return Results.Ok(posts);
@@ -116,7 +118,9 @@ namespace FileBlogSystem.Endpoints
                     postMeta.CustomUrl,
                     postMeta.ImageUrl,
                     postMeta.Slug,
-                    Content = content
+                    Content = content,
+                    postMeta.LikedByUsers,
+                    LikeCount = postMeta.LikedByUsers?.Count ?? 0
                 });
             })
             .RequireAuthorization()
@@ -534,6 +538,68 @@ namespace FileBlogSystem.Endpoints
             .WithName("DeleteUser")
             .WithOpenApi();
 
+          app.MapPost("/api/posts/{postId}/like", async (Guid postId, ClaimsPrincipal user, IFileContentService contentService) =>
+          {
+              var username = user.Identity?.Name;
+              if (string.IsNullOrEmpty(username)) return Results.Unauthorized();
+          
+              var post = await contentService.GetBlogPostMetaByIdAsync(postId);
+              if (post == null) return Results.NotFound("Post not found");
+          
+              if (!post.LikedByUsers.Contains(username))
+              {
+                  post.LikedByUsers.Add(username);
+              }
+          
+              var updated = await contentService.SaveUpdatedMetaAsync(post);
+              return updated ? Results.Ok(new { likedBy = post.LikedByUsers }) : Results.StatusCode(500);
+          })
+          .RequireAuthorization()
+          .WithName("LikePost");
+          
+          app.MapPost("/api/posts/{postId}/unlike", async (Guid postId, ClaimsPrincipal user, IFileContentService contentService) =>
+          {
+              var username = user.Identity?.Name;
+              if (string.IsNullOrEmpty(username)) return Results.Unauthorized();
+          
+              var post = await contentService.GetBlogPostMetaByIdAsync(postId);
+              if (post == null) return Results.NotFound("Post not found");
+          
+              if (post.LikedByUsers.Contains(username))
+              {
+                  post.LikedByUsers.Remove(username);
+              }
+          
+              var updated = await contentService.SaveUpdatedMetaAsync(post);
+              return updated ? Results.Ok(new { likedBy = post.LikedByUsers }) : Results.StatusCode(500);
+          })
+          .RequireAuthorization()
+          .WithName("UnlikePost");
+
+          app.MapGet("/api/posts/{slug}/comments", async (string slug, IFileContentService contentService) =>
+           {
+               
+               var comments = await contentService.GetCommentsAsync(slug);
+               return Results.Ok(comments);
+           })
+           .RequireAuthorization()
+           .WithName("GetCommentsForPost")
+           .Produces<List<CommentModel>>(StatusCodes.Status200OK);
+                       
+            app.MapPost("/api/posts/{slug}/comments", async (string slug, CommentModel input, ClaimsPrincipal user, IFileContentService contentService) =>
+            {
+                input.Username = user.Identity?.Name ?? "anonymous";
+                input.CreatedAt = DateTime.UtcNow;
+            
+                var success = await contentService.AddCommentAsync(slug, input);
+                return success ? Results.Ok(input) : Results.NotFound("post-not-found");
+            })
+            .RequireAuthorization()
+            .WithName("AddComment")
+            .Produces<CommentModel>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+            
+          
 
             return app;
         }

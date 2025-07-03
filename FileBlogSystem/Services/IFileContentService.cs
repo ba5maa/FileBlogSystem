@@ -22,6 +22,10 @@ namespace FileBlogSystem.Services
         Task<UserResponse?> CreateUserAsync(CreateUserRequest request);
         Task<UserResponse?> UpdateUserAsync(string username, UpdateUserRequest request);
         Task<bool> DeleteUserAsync(string username);
+        Task<BlogPostMetaResponse?> GetBlogPostMetaByIdAsync(Guid id);
+        Task<bool> SaveUpdatedMetaAsync(BlogPostMetaResponse post);
+        Task<bool> AddCommentAsync(string slug, CommentModel comment);
+        Task<List<CommentModel>> GetCommentsAsync(string slug);
 
     }
 }
