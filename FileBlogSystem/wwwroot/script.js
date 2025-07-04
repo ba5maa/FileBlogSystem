@@ -84,6 +84,70 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  async function fetchCommentsForPost(postSlug) {
+    try {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}/comments`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch comments: ${response.status}`)
+      }
+      const comments = await response.json()
+      return comments
+    } catch (error) {
+      console.error("Error fetching comments:", error)
+      return []
+    }
+  }
+
+  async function addCommentToPost(postSlug, commentContent) {
+    try {
+      const commentData = {
+        content: commentContent,
+        username: user.username,
+        createdAt: new Date().toISOString(),
+      }
+
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}/comments`, {
+        method: "POST",
+        body: JSON.stringify(commentData),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to add comment: ${response.status}`)
+      }
+
+      const newComment = await response.json()
+      return newComment
+    } catch (error) {
+      console.error("Error adding comment:", error)
+      return null
+    }
+  }
+
+  function displayComments(comments, commentsList) {
+    commentsList.innerHTML = ""
+
+    if (comments.length === 0) {
+      commentsList.innerHTML = '<p class="no-comments">No comments yet. Be the first to comment!</p>'
+      return
+    }
+
+    comments.forEach((comment) => {
+      const commentElement = document.createElement("div")
+      commentElement.className = "comment-item"
+      commentElement.innerHTML = `
+        <div class="comment-header">
+          <div class="comment-author">
+            <i class="fas fa-user-circle"></i>
+            @${comment.username}
+          </div>
+          <div class="comment-date">${formatDate(comment.createdAt)}</div>
+        </div>
+        <p class="comment-content">${comment.content}</p>
+      `
+      commentsList.appendChild(commentElement)
+    })
+  }
+
   async function fetchCategoriesAndTags() {
     try {
       const [categoriesRes, tagsRes] = await Promise.all([
@@ -625,10 +689,9 @@ document.addEventListener("DOMContentLoaded", () => {
         postCard.classList.add("post-card")
         postCard.dataset.tags = post.tags && Array.isArray(post.tags) ? post.tags.join(",") : ""
         postCard.dataset.post = JSON.stringify(post)
-        const isLikedByCurrentUser = post.likedByUsers?.includes(user?.username);
-        const likeCount = post.likedByUsers?.length || 0;
-        const commentsList = postCard.querySelector(`.comments-list[data-post-id="${post.id}"]`);
-        const slug = post.slug;
+        const isLikedByCurrentUser = post.likedByUsers?.includes(user?.username)
+        const likeCount = post.likedByUsers?.length || 0
+        const slug = post.slug
 
         const isAuthor = isAuthenticated() && user.username === post.AuthorUsername
         console.log("DEBUG just seeing post:", post)
@@ -673,14 +736,14 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
             <div class="comment-count">
                 <i class="fas fa-comment"></i>
-                <span class="comment-count-text">0 comments</span>
+                <span class="comment-count-text">${post.commentCount || 0} comments</span>
             </div>
         </div>
         
         <div class="comments-section">
             <div class="comments-header">
                 <h4><i class="fas fa-comments"></i> Comments</h4>
-                <button class="toggle-comments-btn" data-post-id="${post.id}">
+                <button class="toggle-comments-btn" data-post-slug="${post.slug}">
                     <span class="toggle-text">Show Comments</span>
                     <i class="fas fa-chevron-down"></i>
                 </button>
@@ -690,8 +753,8 @@ document.addEventListener("DOMContentLoaded", () => {
               isAuthenticated()
                 ? `
                 <div class="comment-form">
-                    <textarea class="comment-input" placeholder="Write a comment..." data-post-id="${post.id}"></textarea>
-                    <button class="comment-submit-btn" data-post-id="${post.id}">
+                    <textarea class="comment-input" placeholder="Write a comment..." data-post-slug="${post.slug}"></textarea>
+                    <button class="comment-submit-btn" data-post-slug="${post.slug}">
                         <i class="fas fa-paper-plane"></i>
                         Post
                     </button>
@@ -700,7 +763,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 : '<p class="no-comments">Please log in to comment</p>'
             }
             
-            <div class="comments-list" data-post-id="${post.id}">
+            <div class="comments-list" data-post-slug="${post.slug}">
                 <p class="no-comments">No comments yet. Be the first to comment!</p>
             </div>
         </div>
@@ -724,8 +787,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     </div>
 `
-        
+
         postsContainer.appendChild(postCard)
+
+        fetchCommentsForPost(post.slug).then((comments) => {
+          const commentCountSpan = postCard.querySelector(".comment-count-text");
+          if (commentCountSpan) {
+            commentCountSpan.textContent = `${comments.length} comment${comments.length !== 1 ? "s" : ""}`;
+          }
+        });
       })
 
       postsContainer.querySelectorAll(".dropdown-toggle").forEach((button) => {
@@ -766,49 +836,35 @@ document.addEventListener("DOMContentLoaded", () => {
           e.preventDefault()
           const likeBtn = e.currentTarget
           const postId = likeBtn.dataset.postId
-          const isLiked = likeBtn.classList.contains("liked");
+          const isLiked = likeBtn.classList.contains("liked")
           const likeCount = likeBtn.parentElement.querySelector(".like-count")
 
-             try {
-              const url = `${API_BASE_URL}/api/posts/${postId}/${isLiked ? "unlike" : "like"}`;
-              const response = await fetchAuthenticated(url, { method: "POST" });
-              if (!response.ok) throw new Error("Failed to update like");
-            
-              const result = await response.json();
-              const newCount = result.likedBy?.length || 0;
-            
-              likeBtn.classList.toggle("liked");
-              likeBtn.querySelector("span").textContent = isLiked ? "Like" : "Liked";
-              likeBtn.parentElement.querySelector(".like-count").textContent = `${newCount} like${newCount !== 1 ? "s" : ""}`;
+          try {
+            const url = `${API_BASE_URL}/api/posts/${postId}/${isLiked ? "unlike" : "like"}`
+            const response = await fetchAuthenticated(url, { method: "POST" })
+            if (!response.ok) throw new Error("Failed to update like")
 
-            //    if (likeBtn.classList.contains("liked")) {
-            //        likeBtn.classList.remove("liked")
-            //        likeBtn.querySelector("span").textContent = "Like"
-            //        const currentCount = Number.parseInt(likeCount.textContent) || 0
-            //        const newCount = Math.max(0, currentCount - 1)
-            //        likeCount.textContent = `${newCount} like${newCount !== 1 ? "s" : ""}`
-            //      } else {
-            //        likeBtn.classList.add("liked")
-            //        likeBtn.querySelector("span").textContent = "Liked"
-            //        const currentCount = Number.parseInt(likeCount.textContent) || 0
-            //        const newCount = currentCount + 1
-            //        likeCount.textContent = `${newCount} like${newCount !== 1 ? "s" : ""}`
-            //      }
-            } catch (err) {
-              console.error("Like toggle error:", err);
-            }
+            const result = await response.json()
+            const newCount = result.likedBy?.length || 0
 
-           })
+            likeBtn.classList.toggle("liked")
+            likeBtn.querySelector("span").textContent = isLiked ? "Like" : "Liked"
+            likeBtn.parentElement.querySelector(".like-count").textContent =
+              `${newCount} like${newCount !== 1 ? "s" : ""}`
+          } catch (err) {
+            console.error("Like toggle error:", err)
+          }
+        })
       })
 
-      
       postsContainer.querySelectorAll(".toggle-comments-btn").forEach((button) => {
-        button.addEventListener("click", (e) => {
+        button.addEventListener("click", async (e) => {
           e.preventDefault()
-          const postId = e.currentTarget.dataset.postId
-          const commentsList = document.querySelector(`.comments-list[data-post-id="${postId}"]`)
+          const postSlug = e.currentTarget.dataset.postSlug
+          const commentsList = document.querySelector(`.comments-list[data-post-slug="${postSlug}"]`)
           const toggleText = e.currentTarget.querySelector(".toggle-text")
           const toggleIcon = e.currentTarget.querySelector("i")
+          const commentCountText = e.currentTarget.closest(".post-card").querySelector(".comment-count-text")
 
           if (commentsList.classList.contains("show")) {
             commentsList.classList.remove("show")
@@ -818,19 +874,26 @@ document.addEventListener("DOMContentLoaded", () => {
             commentsList.classList.add("show")
             toggleText.textContent = "Hide Comments"
             toggleIcon.className = "fas fa-chevron-up"
+
+            commentsList.innerHTML =
+              '<p class="loading-comments"><i class="fas fa-spinner fa-spin"></i> Loading comments...</p>'
+
+            const comments = await fetchCommentsForPost(postSlug)
+            displayComments(comments, commentsList)
+
+            commentCountText.textContent = `${comments.length} comment${comments.length !== 1 ? "s" : ""}`
           }
         })
       })
 
-      // Comment submission functionality
       postsContainer.querySelectorAll(".comment-submit-btn").forEach((button) => {
         button.addEventListener("click", async (e) => {
           e.preventDefault()
-          const postId = e.currentTarget.dataset.postId
-          const commentInput = document.querySelector(`.comment-input[data-post-id="${postId}"]`)
-          const commentsList = document.querySelector(`.comments-list[data-post-id="${postId}"]`)
+          const postSlug = e.currentTarget.dataset.postSlug
+          const commentInput = document.querySelector(`.comment-input[data-post-slug="${postSlug}"]`)
+          const commentsList = document.querySelector(`.comments-list[data-post-slug="${postSlug}"]`)
           const commentCountText = document
-            .querySelector(`[data-post-id="${postId}"]`)
+            .querySelector(`[data-post-slug="${postSlug}"]`)
             .closest(".post-card")
             .querySelector(".comment-count-text")
 
@@ -838,49 +901,37 @@ document.addEventListener("DOMContentLoaded", () => {
             return
           }
 
-          // Create comment element
-          const commentElement = document.createElement("div")
-          commentElement.className = "comment-item"
-          commentElement.innerHTML = `
-            <div class="comment-header">
-                <div class="comment-author">
-                    <i class="fas fa-user-circle"></i>
-                    @${user.username}
-                </div>
-                <div class="comment-date">Just now</div>
-            </div>
-            <p class="comment-content">${commentInput.value}</p>
-        `
+          const originalText = button.innerHTML
+          button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...'
+          button.disabled = true
 
-          // Remove "no comments" message if it exists
-          const noCommentsMsg = commentsList.querySelector(".no-comments")
-          if (noCommentsMsg) {
-            noCommentsMsg.remove()
+          try {
+            const newComment = await addCommentToPost(postSlug, commentInput.value.trim())
+
+            if (newComment) {
+              commentInput.value = ""
+
+              const comments = await fetchCommentsForPost(postSlug)
+              displayComments(comments, commentsList)
+
+              commentCountText.textContent = `${comments.length} comment${comments.length !== 1 ? "s" : ""}`
+
+              if (!commentsList.classList.contains("show")) {
+                commentsList.classList.add("show")
+                const toggleBtn = document.querySelector(`.toggle-comments-btn[data-post-slug="${postSlug}"]`)
+                toggleBtn.querySelector(".toggle-text").textContent = "Hide Comments"
+                toggleBtn.querySelector("i").className = "fas fa-chevron-up"
+              }
+            } else {
+              showMessage("Failed to add comment. Please try again.", "error", commentsList)
+            }
+          } catch (error) {
+            console.error("Error adding comment:", error)
+            showMessage("Error adding comment. Please try again.", "error", commentsList)
+          } finally {
+            button.innerHTML = originalText
+            button.disabled = false
           }
-
-          // Add comment to list
-          commentsList.appendChild(commentElement)
-
-          // Update comment count
-          const currentComments = commentsList.querySelectorAll(".comment-item").length
-          commentCountText.textContent = `${currentComments} comment${currentComments !== 1 ? "s" : ""}`
-
-          // Clear input
-          commentInput.value = ""
-
-          // Show comments if hidden
-          if (!commentsList.classList.contains("show")) {
-            commentsList.classList.add("show")
-            const toggleBtn = document.querySelector(`.toggle-comments-btn[data-post-id="${postId}"]`)
-            toggleBtn.querySelector(".toggle-text").textContent = "Hide Comments"
-            toggleBtn.querySelector("i").className = "fas fa-chevron-up"
-          }
-
-          // Here you would typically make an API call to save the comment
-          // Example: await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postId}/comments`, {
-          //     method: 'POST',
-          //     body: JSON.stringify({ content: commentInput.value })
-          // });
         })
       })
     } catch (error) {

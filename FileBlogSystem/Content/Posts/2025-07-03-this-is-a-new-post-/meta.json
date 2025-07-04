@@ -1,0 +1,22 @@
+{
+  "Id": "e67a9b07-1f57-4242-b7be-59ef21568f78",
+  "Title": "this is a new post ",
+  "Description": "",
+  "CreationDate": "0001-01-01T00:00:00",
+  "PublishedDate": null,
+  "ModificationDate": "2025-07-03T16:25:04.9406739Z",
+  "Tags": [
+    "3b53d125-b543-4931-99bd-4d16d3a83fb6"
+  ],
+  "Categories": [
+    "69a9f441-4338-4b10-a146-5ba7a8158d00"
+  ],
+  "CustomUrl": null,
+  "Slug": "this-is-a-new-post-",
+  "isDraft": true,
+  "Content": "",
+  "ImageUrl": null,
+  "AuthorUsername": "admin",
+  "ScheduledFor": null,
+  "LikedByUsers": []
+}
