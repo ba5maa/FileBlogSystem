@@ -791,11 +791,11 @@ document.addEventListener("DOMContentLoaded", () => {
         postsContainer.appendChild(postCard)
 
         fetchCommentsForPost(post.slug).then((comments) => {
-          const commentCountSpan = postCard.querySelector(".comment-count-text");
+          const commentCountSpan = postCard.querySelector(".comment-count-text")
           if (commentCountSpan) {
-            commentCountSpan.textContent = `${comments.length} comment${comments.length !== 1 ? "s" : ""}`;
+            commentCountSpan.textContent = `${comments.length} comment${comments.length !== 1 ? "s" : ""}`
           }
-        });
+        })
       })
 
       postsContainer.querySelectorAll(".dropdown-toggle").forEach((button) => {
@@ -1494,6 +1494,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     <button class="nav-btn ${currentPage === "drafts" ? "active" : ""}" data-page="drafts">
                         <i class="fas fa-edit"></i> My Drafts & Posts
                     </button>
+                    ${
+                      user.roles && user.roles.includes("Admin")
+                        ? `
+<button class="nav-btn ${currentPage === "admin" ? "active" : ""}" data-page="admin">
+    <i class="fas fa-shield-alt"></i> Admin Panel
+</button>
+`
+                        : ""
+                    }
                 </div>
                 <div class="nav-user">
                      <img src="${API_BASE_URL}/content/static/avatar.jpg" class="avatar-img" alt="Avatar" />
@@ -1538,6 +1547,575 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  async function renderAdminPage() {
+    if (!isAuthenticated() || !user.roles.includes("Admin")) {
+      showMessage("You must be an admin to access this page.", "error", appContainer)
+      currentPage = "feed"
+      renderAppContent()
+      return
+    }
+
+    appContainer.innerHTML = `
+    <div class="admin-page">
+      <div class="page-header">
+        <h2><i class="fas fa-shield-alt"></i> Admin Panel</h2>
+        <p>Manage users, categories, and tags</p>
+      </div>
+      
+      <div class="admin-sections">
+        <!-- User Management Section -->
+        <div class="admin-section">
+          <div class="section-header">
+            <h3><i class="fas fa-users"></i> User Management</h3>
+            <div class="section-stats">
+              <span id="users-count">Loading...</span>
+            </div>
+          </div>
+          <div id="users-container" class="admin-container">
+            <div class="loading-posts">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>Loading users...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Categories Management Section -->
+        <div class="admin-section">
+          <div class="section-header">
+            <h3><i class="fas fa-folder"></i> Categories Management</h3>
+            <button class="btn btn-primary" id="add-category-btn">
+              <i class="fas fa-plus"></i> Add Category
+            </button>
+          </div>
+          <div id="categories-container" class="admin-container">
+            <div class="loading-posts">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>Loading categories...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tags Management Section -->
+        <div class="admin-section">
+          <div class="section-header">
+            <h3><i class="fas fa-tags"></i> Tags Management</h3>
+            <button class="btn btn-primary" id="add-tag-btn">
+              <i class="fas fa-plus"></i> Add Tag
+            </button>
+          </div>
+          <div id="tags-container" class="admin-container">
+            <div class="loading-posts">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>Loading tags...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+
+    loadAdminData()
+  }
+
+  async function loadAdminData() {
+    await Promise.all([loadUsersAdmin(), loadCategoriesAdmin(), loadTagsAdmin()])
+  }
+
+  async function loadUsersAdmin() {
+    const usersContainer = document.getElementById("users-container")
+    const usersCount = document.getElementById("users-count")
+
+    try {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/users`)
+      if (!response.ok) throw new Error("Failed to fetch users")
+
+      const users = await response.json()
+      usersContainer.innerHTML = ""
+      usersCount.textContent = `${users.length} users`
+
+      users.forEach((user) => {
+        const userCard = document.createElement("div")
+        userCard.className = "admin-item-card"
+        userCard.innerHTML = `
+        <div class="admin-item-header">
+          <div class="admin-item-info">
+            <h4>@${user.username}</h4>
+            <p>${user.email}</p>
+            <div class="user-roles">
+              ${user.roles.map((role) => `<span class="role-badge ${role.toLowerCase()}">${role}</span>`).join("")}
+            </div>
+          </div>
+          <div class="admin-item-actions">
+            ${
+              !user.roles.includes("Admin")
+                ? `
+              <button class="btn btn-success btn-sm make-admin-btn" data-username="${user.username}">
+                <i class="fas fa-user-shield"></i> Make Admin
+              </button>
+            `
+                : user.username !== window.user?.username
+                  ? `
+              <button class="btn btn-warning btn-sm remove-admin-btn" data-username="${user.username}">
+                <i class="fas fa-user-minus"></i> Remove Admin
+              </button>
+            `
+                  : ""
+            }
+            ${
+              user.username !== window.user?.username
+                ? `
+              <button class="btn btn-danger btn-sm delete-user-btn" data-username="${user.username}">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            `
+                : '<span class="text-muted">Current User</span>'
+            }
+          </div>
+        </div>
+      `
+        usersContainer.appendChild(userCard)
+      })
+
+      usersContainer.querySelectorAll(".make-admin-btn").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          const username = e.target.dataset.username
+          if (confirm(`Make ${username} an admin?`)) {
+            await toggleUserAdmin(username, true)
+            loadUsersAdmin()
+          }
+        })
+      })
+
+      usersContainer.querySelectorAll(".remove-admin-btn").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          const username = e.target.dataset.username
+          if (confirm(`Remove admin privileges from ${username}?`)) {
+            await toggleUserAdmin(username, false)
+            loadUsersAdmin()
+          }
+        })
+      })
+
+      usersContainer.querySelectorAll(".delete-user-btn").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          const username = e.target.dataset.username
+          if (confirm(`Delete user ${username}? This action cannot be undone.`)) {
+            await deleteUser(username)
+            loadUsersAdmin()
+          }
+        })
+      })
+    } catch (error) {
+      usersContainer.innerHTML = `
+      <div class="error-state">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>Error loading users: ${error.message}</p>
+      </div>
+    `
+      usersCount.textContent = "Error"
+    }
+  }
+
+  async function loadCategoriesAdmin() {
+    const categoriesContainer = document.getElementById("categories-container")
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/categories`)
+      if (!response.ok) throw new Error("Failed to fetch categories")
+
+      const categories = await response.json()
+      categoriesContainer.innerHTML = ""
+
+      if (categories.length === 0) {
+        categoriesContainer.innerHTML = `
+        <div class="empty-state">
+          <i class="fas fa-folder-open"></i>
+          <h3>No categories yet</h3>
+          <p>Create your first category</p>
+        </div>
+      `
+        return
+      }
+
+      categories.forEach((category) => {
+        const categoryCard = document.createElement("div")
+        categoryCard.className = "admin-item-card"
+        categoryCard.innerHTML = `
+        <div class="admin-item-header">
+          <div class="admin-item-info">
+            <h4>${category.name}</h4>
+            <p>${category.description || "No description"}</p>
+          </div>
+          <div class="admin-item-actions">
+            <button class="btn btn-outline btn-sm edit-category-btn" data-category='${JSON.stringify(category)}'>
+              <i class="fas fa-edit"></i> Edit
+            </button>
+            <button class="btn btn-danger btn-sm delete-category-btn" data-id="${category.id}" data-name="${category.name}">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </div>
+        </div>
+      `
+        categoriesContainer.appendChild(categoryCard)
+      })
+
+      categoriesContainer.querySelectorAll(".edit-category-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          const category = JSON.parse(e.target.dataset.category)
+          showCategoryModal(category)
+        })
+      })
+
+      categoriesContainer.querySelectorAll(".delete-category-btn").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          const id = e.target.dataset.id
+          const name = e.target.dataset.name
+          if (confirm(`Delete category "${name}"? This action cannot be undone.`)) {
+            await deleteCategory(id)
+            loadCategoriesAdmin()
+          }
+        })
+      })
+    } catch (error) {
+      categoriesContainer.innerHTML = `
+      <div class="error-state">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>Error loading categories: ${error.message}</p>
+      </div>
+    `
+    }
+
+    document.getElementById("add-category-btn").addEventListener("click", () => {
+      showCategoryModal()
+    })
+  }
+
+  async function loadTagsAdmin() {
+    const tagsContainer = document.getElementById("tags-container")
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/tags`)
+      if (!response.ok) throw new Error("Failed to fetch tags")
+
+      const tags = await response.json()
+      tagsContainer.innerHTML = ""
+
+      if (tags.length === 0) {
+        tagsContainer.innerHTML = `
+        <div class="empty-state">
+          <i class="fas fa-tags"></i>
+          <h3>No tags yet</h3>
+          <p>Create your first tag</p>
+        </div>
+      `
+        return
+      }
+
+      tags.forEach((tag) => {
+        const tagCard = document.createElement("div")
+        tagCard.className = "admin-item-card"
+        tagCard.innerHTML = `
+        <div class="admin-item-header">
+          <div class="admin-item-info">
+            <h4>${tag.name}</h4>
+          </div>
+          <div class="admin-item-actions">
+            <button class="btn btn-outline btn-sm edit-tag-btn" data-tag='${JSON.stringify(tag)}'>
+              <i class="fas fa-edit"></i> Edit
+            </button>
+            <button class="btn btn-danger btn-sm delete-tag-btn" data-id="${tag.id}" data-name="${tag.name}">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </div>
+        </div>
+      `
+        tagsContainer.appendChild(tagCard)
+      })
+
+      tagsContainer.querySelectorAll(".edit-tag-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          const tag = JSON.parse(e.target.dataset.tag)
+          showTagModal(tag)
+        })
+      })
+
+      tagsContainer.querySelectorAll(".delete-tag-btn").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          const id = e.target.dataset.id
+          const name = e.target.dataset.name
+          if (confirm(`Delete tag "${name}"? This action cannot be undone.`)) {
+            await deleteTag(id)
+            loadTagsAdmin()
+          }
+        })
+      })
+    } catch (error) {
+      tagsContainer.innerHTML = `
+      <div class="error-state">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>Error loading tags: ${error.message}</p>
+      </div>
+    `
+    }
+
+    document.getElementById("add-tag-btn").addEventListener("click", () => {
+      showTagModal()
+    })
+  }
+
+  async function toggleUserAdmin(username, makeAdmin) {
+    try {
+      const getUserResponse = await fetchAuthenticated(`${API_BASE_URL}/api/users/${username}`)
+      if (!getUserResponse.ok) throw new Error("Failed to fetch user")
+
+      const userData = await getUserResponse.json()
+      let newRoles = [...userData.roles]
+
+      if (makeAdmin && !newRoles.includes("Admin")) {
+        newRoles.push("Admin")
+      } else if (!makeAdmin && newRoles.includes("Admin")) {
+        newRoles = newRoles.filter((role) => role !== "Admin")
+      }
+
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/users/${username}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          email: userData.email,
+          roles: newRoles,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to update user")
+
+      showMessage(
+        `User ${username} ${makeAdmin ? "promoted to" : "removed from"} admin successfully!`,
+        "success",
+        appContainer,
+      )
+      return true
+    } catch (error) {
+      showMessage(`Error updating user: ${error.message}`, "error", appContainer)
+      return false
+    }
+  }
+
+  async function deleteUser(username) {
+    try {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/users/${username}`, {
+        method: "DELETE",
+      })
+
+      if (response.status === 204) {
+        showMessage(`User ${username} deleted successfully!`, "success", appContainer)
+        return true
+      } else {
+        throw new Error("Failed to delete user")
+      }
+    } catch (error) {
+      showMessage(`Error deleting user: ${error.message}`, "error", appContainer)
+      return false
+    }
+  }
+
+  function showCategoryModal(category = null) {
+    const isEdit = !!category
+    const modalHtml = `
+    <div class="modal-overlay" id="category-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>${isEdit ? "Edit Category" : "Add Category"}</h3>
+          <button class="modal-close" id="close-category-modal">&times;</button>
+        </div>
+        <form id="category-form" class="modal-form">
+          <div class="form-group">
+            <label for="category-name">Name</label>
+            <input type="text" id="category-name" value="${category?.name || ""}" required>
+          </div>
+          <div class="form-group">
+            <label for="category-description">Description</label>
+            <textarea id="category-description" rows="3">${category?.description || ""}</textarea>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="cancel-category">Cancel</button>
+            <button type="submit" class="btn btn-primary">
+              ${isEdit ? "Update" : "Create"} Category
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `
+
+    document.body.insertAdjacentHTML("beforeend", modalHtml)
+
+    const modal = document.getElementById("category-modal")
+    const form = document.getElementById("category-form")
+    const closeBtn = document.getElementById("close-category-modal")
+    const cancelBtn = document.getElementById("cancel-category")
+
+    const closeModal = () => {
+      modal.remove()
+    }
+
+    closeBtn.addEventListener("click", closeModal)
+    cancelBtn.addEventListener("click", closeModal)
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeModal()
+    })
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault()
+      const name = document.getElementById("category-name").value
+      const description = document.getElementById("category-description").value
+
+      try {
+        let response
+        if (isEdit) {
+          response = await fetchAuthenticated(`${API_BASE_URL}/api/categories`, {
+            method: "PUT",
+            body: JSON.stringify({
+              id: category.id,
+              newName: name,
+              description: description,
+            }),
+          })
+        } else {
+          response = await fetchAuthenticated(`${API_BASE_URL}/api/categories`, {
+            method: "POST",
+            body: JSON.stringify({
+              name: name,
+              description: description,
+            }),
+          })
+        }
+
+        if (!response.ok) throw new Error("Failed to save category")
+
+        showMessage(`Category ${isEdit ? "updated" : "created"} successfully!`, "success", appContainer)
+        closeModal()
+        loadCategoriesAdmin()
+        fetchCategoriesAndTags()
+      } catch (error) {
+        showMessage(`Error saving category: ${error.message}`, "error", form)
+      }
+    })
+  }
+
+  function showTagModal(tag = null) {
+    const isEdit = !!tag
+    const modalHtml = `
+    <div class="modal-overlay" id="tag-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>${isEdit ? "Edit Tag" : "Add Tag"}</h3>
+          <button class="modal-close" id="close-tag-modal">&times;</button>
+        </div>
+        <form id="tag-form" class="modal-form">
+          <div class="form-group">
+            <label for="tag-name">Name</label>
+            <input type="text" id="tag-name" value="${tag?.name || ""}" required>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="cancel-tag">Cancel</button>
+            <button type="submit" class="btn btn-primary">
+              ${isEdit ? "Update" : "Create"} Tag
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `
+
+    document.body.insertAdjacentHTML("beforeend", modalHtml)
+
+    const modal = document.getElementById("tag-modal")
+    const form = document.getElementById("tag-form")
+    const closeBtn = document.getElementById("close-tag-modal")
+    const cancelBtn = document.getElementById("cancel-tag")
+
+    const closeModal = () => {
+      modal.remove()
+    }
+
+    closeBtn.addEventListener("click", closeModal)
+    cancelBtn.addEventListener("click", closeModal)
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeModal()
+    })
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault()
+      const name = document.getElementById("tag-name").value
+
+      try {
+        let response
+        if (isEdit) {
+          response = await fetchAuthenticated(`${API_BASE_URL}/api/tags`, {
+            method: "PUT",
+            body: JSON.stringify({
+              id: tag.id,
+              newName: name,
+            }),
+          })
+        } else {
+          response = await fetchAuthenticated(`${API_BASE_URL}/api/tags`, {
+            method: "POST",
+            body: JSON.stringify({
+              name: name,
+            }),
+          })
+        }
+
+        if (!response.ok) throw new Error("Failed to save tag")
+
+        showMessage(`Tag ${isEdit ? "updated" : "created"} successfully!`, "success", appContainer)
+        closeModal()
+        loadTagsAdmin()
+        fetchCategoriesAndTags()
+      } catch (error) {
+        showMessage(`Error saving tag: ${error.message}`, "error", form)
+      }
+    })
+  }
+
+  async function deleteCategory(id) {
+    try {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/categories/${id}`, {
+        method: "DELETE",
+      })
+
+      if (response.status === 204) {
+        showMessage("Category deleted successfully!", "success", appContainer)
+        fetchCategoriesAndTags()
+        return true
+      } else {
+        throw new Error("Failed to delete category")
+      }
+    } catch (error) {
+      showMessage(`Error deleting category: ${error.message}`, "error", appContainer)
+      return false
+    }
+  }
+
+  async function deleteTag(id) {
+    try {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/tags/${id}`, {
+        method: "DELETE",
+      })
+
+      if (response.status === 204) {
+        showMessage("Tag deleted successfully!", "success", appContainer)
+        fetchCategoriesAndTags()
+        return true
+      } else {
+        throw new Error("Failed to delete tag")
+      }
+    } catch (error) {
+      showMessage(`Error deleting tag: ${error.message}`, "error", appContainer)
+      return false
+    }
+  }
+
   async function renderAppContent() {
     loadAuthData()
 
@@ -1559,7 +2137,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (isAuthenticated()) {
-      if (currentPage === "drafts") {
+      if (currentPage === "admin") {
+        renderAdminPage()
+      } else if (currentPage === "drafts") {
         renderDraftsPage()
       } else {
         renderDashboard()
