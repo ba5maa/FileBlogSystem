@@ -1,6 +1,10 @@
 {
   "Username": "admin",
   "Email": "admin@example.com",
+  "Roles": [
+    "Admin",
+    "Author"
+  ],
   "HashedPassword": "$2a$10$HCM1685NEYziVgKqRBBY6es1epov68JlEh1p0/7psc5dP0iN1pGpm",
-  "Roles": ["Admin", "Author"]
+  "ProfilePictureUrl": "/content/users/admin/profilepicture/profile.jpeg"
 }

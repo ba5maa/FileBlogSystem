@@ -11,9 +11,11 @@ namespace FileBlogSystem.Models
         public string Email { get; set; } = string.Empty;
 
         [MinLength(8)]
-        [MaxLength(255)] 
+        [MaxLength(255)]
         public string? HashedPassword { get; set; }
 
         public List<string> Roles { get; set; } = new List<string>();
+        public string? ProfilePictureBase64 { get; set; }
+        public string? ProfilePictureFileName { get; set; } 
     }
 }

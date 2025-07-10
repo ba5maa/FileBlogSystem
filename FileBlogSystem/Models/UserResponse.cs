@@ -12,5 +12,6 @@ namespace FileBlogSystem.Models
         public string HashedPassword { get; set; } = string.Empty;
         [JsonIgnore]
         public string? Id { get; set; }
+        public string? ProfilePictureUrl { get; set; }
     }
 }

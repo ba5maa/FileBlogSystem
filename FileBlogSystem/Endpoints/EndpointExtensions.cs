@@ -195,14 +195,14 @@ namespace FileBlogSystem.Endpoints
                 var user = await contentService.GetUserByUsernameAsync(request.Username);
                 if (user == null)
                 {
-                    return Results.Unauthorized();
+                    return Results.Json(new { message = "Invalid username or password" }, statusCode: 401);
                 }
 
                 Console.WriteLine($"User found: {user.Username}. Stored hash: {user.HashedPassword}");
 
                 if (!PasswordHasher.VerifyPassword(request.Password, user.HashedPassword))
                 {
-                    return Results.Unauthorized();
+                    return Results.Json(new { message = "Invalid username or password" }, statusCode: 401);
                 }
 
                 Console.WriteLine($"Login successful for user: {user.Username}. Generating token...");
@@ -514,11 +514,17 @@ namespace FileBlogSystem.Endpoints
 
             app.MapPut("/api/users/{username}", async (string username, UpdateUserRequest request, IFileContentService contentService) =>
             {
+                 if (!string.IsNullOrEmpty(request.HashedPassword))
+                {
+                    request.HashedPassword = PasswordHasher.HashPassword(request.HashedPassword);
+                }
+
                 var updatedUser = await contentService.UpdateUserAsync(username, request);
                 if (updatedUser == null)
                 {
                     return Results.NotFound($"user-'{username}'-not-found-or-could-not-be-updated");
                 }
+
                 return Results.Ok(updatedUser);
             })
             .RequireAuthorization()

@@ -91,6 +91,19 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(`Failed to fetch comments: ${response.status}`)
       }
       const comments = await response.json()
+
+      for (const comment of comments) {
+        try {
+          const userResponse = await fetchAuthenticated(`${API_BASE_URL}/api/users/${comment.username}`)
+          if (userResponse.ok) {
+            const userData = await userResponse.json()
+            comment.authorProfilePictureUrl = userData.profilePictureUrl
+          }
+        } catch (error) {
+          comment.authorProfilePictureUrl = null
+        }
+      }
+
       return comments
     } catch (error) {
       console.error("Error fetching comments:", error)
@@ -137,7 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
       commentElement.innerHTML = `
         <div class="comment-header">
           <div class="comment-author">
-            <i class="fas fa-user-circle"></i>
+            <img src="${comment.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="avatar-img" alt="Avatar" style="width: 24px; height: 24px; margin-right: 8px;" />
             @${comment.username}
           </div>
           <div class="comment-date">${formatDate(comment.createdAt)}</div>
@@ -176,6 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
       TAGS = []
     }
   }
+  
 
   function renderAuthForm(type = "login") {
     appContainer.innerHTML = `
@@ -202,8 +216,6 @@ document.addEventListener("DOMContentLoaded", () => {
                                 <label for="confirm-password"><i class="fas fa-lock"></i> Confirm Password</label>
                                 <input type="password" id="confirm-password"> 
                             </div>
-                        </div>
-                        <div id="signup-fields" style="display: ${type === "signup" ? "block" : "none"};">
                             <div class="form-group">
                                 <label for="email"><i class="fas fa-lock"></i> Email</label>
                                 <input type="email" id="email">
@@ -313,7 +325,25 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (currentType === "login") {
-          user = { username: data.user.username, roles: data.user.roles || ["Author"] }
+           try {
+            const userResponse = await fetch(`${API_BASE_URL}/api/users/${data.user.username}`, {
+              headers: { Authorization: `Bearer ${data.token}` },
+            })
+            if (userResponse.ok) {
+              const fullUserData = await userResponse.json()
+              user = {
+                username: data.user.username,
+                roles: data.user.roles || ["Author"],
+                email: fullUserData.email,
+                profilePictureUrl: fullUserData.profilePictureUrl,
+              }
+            } else {
+              user = { username: data.user.username, roles: data.user.roles || ["Author"] }
+            }
+          } catch (error) {
+            user = { username: data.user.username, roles: data.user.roles || ["Author"] }
+          }   
+
           token = data.token
           tokenExpires = new Date(data.expires)
           saveAuthData()
@@ -626,6 +656,28 @@ document.addEventListener("DOMContentLoaded", () => {
     return cat ? cat.name : id
   }
 
+  async function fetchPostsWithProfilePictures(posts) {
+    const userCache = new Map()
+
+    for (const post of posts) {
+      if (!userCache.has(post.authorUsername)) {
+        try {
+          const userResponse = await fetchAuthenticated(`${API_BASE_URL}/api/users/${post.authorUsername}`)
+          if (userResponse.ok) {
+            const userData = await userResponse.json()
+            userCache.set(post.authorUsername, userData.profilePictureUrl)
+          }
+        } catch (error) {
+          console.warn(`Could not fetch profile for ${post.authorUsername}`)
+          userCache.set(post.authorUsername, null)
+        }
+      }
+      post.authorProfilePictureUrl = userCache.get(post.authorUsername)
+    }
+
+    return posts
+  }
+
   async function loadPosts() {
     const postsContainer = document.getElementById("posts-container")
     const postsCount = document.getElementById("posts-count")
@@ -684,7 +736,9 @@ document.addEventListener("DOMContentLoaded", () => {
         return
       }
 
-      posts.forEach((post) => {
+      const enrichedPosts = await fetchPostsWithProfilePictures(posts)
+
+      enrichedPosts.forEach((post) => {
         const postCard = document.createElement("div")
         postCard.classList.add("post-card")
         postCard.dataset.tags = post.tags && Array.isArray(post.tags) ? post.tags.join(",") : ""
@@ -699,7 +753,7 @@ document.addEventListener("DOMContentLoaded", () => {
     <div class="post-header">
         <div class="post-author-info">
             <div class="author-avatar">
-                 <img src="${API_BASE_URL}/content/static/avatar.jpg" class="avatar-img" alt="Avatar" />
+                 <img src="${post.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="avatar-img" alt="Avatar" />
             </div>
             <div class="author-details">
                 <span class="post-author">@${post.authorUsername || "Unknown"}</span>
@@ -1497,54 +1551,281 @@ document.addEventListener("DOMContentLoaded", () => {
                     ${
                       user.roles && user.roles.includes("Admin")
                         ? `
-<button class="nav-btn ${currentPage === "admin" ? "active" : ""}" data-page="admin">
-    <i class="fas fa-shield-alt"></i> Admin Panel
-</button>
-`
+                          <button class="nav-btn ${currentPage === "admin" ? "active" : ""}" data-page="admin">
+                              <i class="fas fa-shield-alt"></i> Admin Panel
+                          </button>
+                          `
                         : ""
                     }
-                </div>
+               </div>
                 <div class="nav-user">
-                     <img src="${API_BASE_URL}/content/static/avatar.jpg" class="avatar-img" alt="Avatar" />
-                    <span class="user-info">
-                        ${user.username}
-                    </span>
-                    <button class="nav-btn logout-btn" id="nav-logout">
-                        <i class="fas fa-sign-out-alt"></i> Logout
+                 <div class="dropdown">
+                   <button class="dropdown-toggle" id="profile-dropdown">
+                     <img src="${user.profilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="avatar-img" alt="Avatar" />
+                     <span>${user.username}</span>
+                     <i class="fas fa-chevron-down"></i>
+                   </button>
+                   <div class="dropdown-menu" id="profile-menu">
+                     <a href="#" class="dropdown-item" id="edit-profile-btn">
+                       <i class="fas fa-user-edit"></i> Edit Profile
+                     </a>
+                     <a href="#" class="dropdown-item" id="change-password-btn">
+                       <i class="fas fa-key"></i> Change Password
+                     </a>
+                     <a href="#" class="dropdown-item" id="nav-logout">
+                       <i class="fas fa-sign-out-alt"></i> Logout
+                     </a>
+                   </div>
+                 </div>
+               </div>
+            `
+
+          document.getElementById("profile-dropdown").addEventListener("click", (e) => {
+            e.stopPropagation()
+            document.getElementById("profile-menu").classList.toggle("show")
+          })
+    
+          document.addEventListener("click", () => {
+            document.getElementById("profile-menu").classList.remove("show")
+          })
+    
+          document.getElementById("edit-profile-btn").addEventListener("click", (e) => {
+            e.preventDefault()
+            showEditProfileModal()
+          })
+    
+          document.getElementById("change-password-btn").addEventListener("click", (e) => {
+            e.preventDefault()
+            showChangePasswordModal()
+          })
+    
+          document.getElementById("nav-logout").addEventListener("click", () => {
+            clearAuthData()
+            currentPage = "feed"
+            renderAppContent()
+          })
+
+           document.querySelectorAll(".nav-btn[data-page]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              currentPage = btn.dataset.page
+              renderAppContent()
+            })
+          })
+    
+        } else {
+          mainNav.innerHTML = `
+                    <button class="nav-btn ${currentPage === "login" ? "active" : ""}" data-page="login" id="nav-login">
+                        <i class="fas fa-sign-in-alt"></i> Login
                     </button>
-                </div>
-            `
+                    <button class="nav-btn ${currentPage === "signup" ? "active" : ""}" data-page="signup" id="nav-signup">
+                        <i class="fas fa-user-plus"></i> Sign Up
+                    </button>
+                `
+          document.getElementById("nav-login").addEventListener("click", () => {
+            currentPage = "login"
+            renderAuthForm("login")
+          })
+          document.getElementById("nav-signup").addEventListener("click", () => {
+            currentPage = "signup"
+            renderAuthForm("signup")
+          })
+        }
+      }
 
-      document.querySelectorAll(".nav-btn[data-page]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          currentPage = btn.dataset.page
-          renderAppContent()
+
+   function showEditProfileModal() {
+    const modalHtml = `
+    <div class="modal-overlay" id="edit-profile-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Edit Profile</h3>
+          <button class="modal-close" id="close-edit-profile-modal">&times;</button>
+        </div>
+        <form id="edit-profile-form" class="modal-form">
+          <div class="form-group">
+            <label for="edit-username">Username</label>
+            <input type="text" id="edit-username" value="${user.username}" required>
+          </div>
+          <div class="form-group">
+            <label for="edit-email">Email</label>
+            <input type="email" id="edit-email" value="${user.email || ""}" required>
+          </div>
+          <div class="form-group">
+            <label for="edit-profile-picture">Profile Picture</label>
+            <input type="file" id="edit-profile-picture" accept="image/*">
+            <div class="current-picture" style="margin-top: 10px;">
+              <img src="${user.profilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" 
+                   alt="Current Profile Picture" 
+                   style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;">
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="cancel-edit-profile">Cancel</button>
+            <button type="submit" class="btn btn-primary">Update Profile</button>
+          </div>
+          <div id="edit-profile-message" class="message" style="display: none;"></div>
+        </form>
+      </div>
+    </div>
+  `
+
+    document.body.insertAdjacentHTML("beforeend", modalHtml)
+
+    const modal = document.getElementById("edit-profile-modal")
+    const form = document.getElementById("edit-profile-form")
+    const closeBtn = document.getElementById("close-edit-profile-modal")
+    const cancelBtn = document.getElementById("cancel-edit-profile")
+    const messageElement = document.getElementById("edit-profile-message")
+
+    const closeModal = () => modal.remove()
+
+    closeBtn.addEventListener("click", closeModal)
+    cancelBtn.addEventListener("click", closeModal)
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeModal()
+    })
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault()
+
+      const username = document.getElementById("edit-username").value
+      const email = document.getElementById("edit-email").value
+      const profilePictureFile = document.getElementById("edit-profile-picture").files[0]
+
+      try {
+        const updateData = {
+          email: email,
+          roles: user.roles,
+        }
+
+        if (profilePictureFile) {
+          updateData.profilePictureBase64 = await readFileAsBase64(profilePictureFile)
+          updateData.profilePictureFileName = profilePictureFile.name
+        }
+
+        const response = await fetchAuthenticated(`${API_BASE_URL}/api/users/${user.username}`, {
+          method: "PUT",
+          body: JSON.stringify(updateData),
         })
-      })
 
-      document.getElementById("nav-logout").addEventListener("click", () => {
-        clearAuthData()
-        currentPage = "feed"
-        renderAppContent()
-      })
-    } else {
-      mainNav.innerHTML = `
-                <button class="nav-btn ${currentPage === "login" ? "active" : ""}" data-page="login" id="nav-login">
-                    <i class="fas fa-sign-in-alt"></i> Login
-                </button>
-                <button class="nav-btn ${currentPage === "signup" ? "active" : ""}" data-page="signup" id="nav-signup">
-                    <i class="fas fa-user-plus"></i> Sign Up
-                </button>
-            `
-      document.getElementById("nav-login").addEventListener("click", () => {
-        currentPage = "login"
-        renderAuthForm("login")
-      })
-      document.getElementById("nav-signup").addEventListener("click", () => {
-        currentPage = "signup"
-        renderAuthForm("signup")
-      })
-    }
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.message || "Failed to update profile")
+        }
+
+        const updatedUser = await response.json()
+        user.email = updatedUser.email
+        user.profilePictureUrl = updatedUser.profilePictureUrl
+        saveAuthData()
+
+        showMessage("Profile updated successfully!", "success", messageElement)
+        setTimeout(() => {
+          closeModal()
+          renderAppContent()
+        }, 1500)
+      } catch (error) {
+        showMessage(error.message, "error", messageElement)
+      }
+    })
+  }
+
+  function showChangePasswordModal() {
+    const modalHtml = `
+    <div class="modal-overlay" id="change-password-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Change Password</h3>
+          <button class="modal-close" id="close-change-password-modal">&times;</button>
+        </div>
+        <form id="change-password-form" class="modal-form">
+          <div class="form-group">
+            <label for="current-password">Current Password</label>
+            <input type="password" id="current-password" required>
+          </div>
+          <div class="form-group">
+            <label for="new-password">New Password</label>
+            <input type="password" id="new-password" required>
+          </div>
+          <div class="form-group">
+            <label for="confirm-new-password">Confirm New Password</label>
+            <input type="password" id="confirm-new-password" required>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="cancel-change-password">Cancel</button>
+            <button type="submit" class="btn btn-primary">Change Password</button>
+          </div>
+          <div id="change-password-message" class="message" style="display: none;"></div>
+        </form>
+      </div>
+    </div>
+  `
+
+    document.body.insertAdjacentHTML("beforeend", modalHtml)
+
+    const modal = document.getElementById("change-password-modal")
+    const form = document.getElementById("change-password-form")
+    const closeBtn = document.getElementById("close-change-password-modal")
+    const cancelBtn = document.getElementById("cancel-change-password")
+    const messageElement = document.getElementById("change-password-message")
+
+    const closeModal = () => modal.remove()
+
+    closeBtn.addEventListener("click", closeModal)
+    cancelBtn.addEventListener("click", closeModal)
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeModal()
+    })
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault()
+
+      const currentPassword = document.getElementById("current-password").value
+      const newPassword = document.getElementById("new-password").value
+      const confirmNewPassword = document.getElementById("confirm-new-password").value
+
+      if (newPassword !== confirmNewPassword) {
+        showMessage("New passwords do not match", "error", messageElement)
+        return
+      }
+
+      try {
+        // First verify current password by attempting login
+        const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: user.username,
+            password: currentPassword,
+          }),
+        })
+
+        if (!loginResponse.ok) {
+          throw new Error("Current password is incorrect")
+        }
+
+        // Update password
+        const response = await fetchAuthenticated(`${API_BASE_URL}/api/users/${user.username}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            email: user.email,
+            roles: user.roles,
+            hashedPassword: newPassword,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.message || "Failed to change password")
+        }
+
+        showMessage("Password changed successfully!", "success", messageElement)
+        setTimeout(() => {
+          closeModal()
+        }, 1500)
+      } catch (error) {
+        showMessage(error.message, "error", messageElement)
+      }
+    })
   }
 
   async function renderAdminPage() {

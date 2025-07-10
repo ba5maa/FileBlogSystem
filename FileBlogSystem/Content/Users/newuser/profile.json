@@ -1,8 +1,9 @@
 {
   "Username": "newuser",
-  "Email": "newuser@example",
+  "Email": "newuser@example.com",
   "Roles": [
     "Author"
   ],
-  "HashedPassword": "$2a$10$NSBrqPhlVNlJopLUSTdtgu59ilVbYbgLyZNuK9YO9V/xtfghmqDom"
+  "HashedPassword": "$2a$10$NSBrqPhlVNlJopLUSTdtgu59ilVbYbgLyZNuK9YO9V/xtfghmqDom",
+  "ProfilePictureUrl": "/content/users/newuser/profilepicture/profile.jpg"
 }

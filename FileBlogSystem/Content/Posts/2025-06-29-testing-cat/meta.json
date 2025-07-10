@@ -19,5 +19,8 @@
   "Content": "",
   "ImageUrl": null,
   "AuthorUsername": "admin",
-  "ScheduledFor": null
+  "ScheduledFor": null,
+  "LikedByUsers": [
+    "admin"
+  ]
 }

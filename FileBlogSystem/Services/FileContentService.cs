@@ -51,6 +51,26 @@ namespace FileBlogSystem.Services
                 return null;
             }
         }
+
+         private string? GetProfilePictureUrl(string username)
+        {
+            var userDir = Path.Combine(_usersFolderPath, username.ToLowerInvariant());
+            var profilePictureDir = Path.Combine(userDir, "profilepicture");
+
+            if (Directory.Exists(profilePictureDir))
+            {
+                var imageFiles = Directory.GetFiles(profilePictureDir)
+                                        .Where(f => Regex.IsMatch(Path.GetExtension(f), @"\.(jpg|jpeg|png|gif|bmp|webp)$", RegexOptions.IgnoreCase))
+                                        .ToList();
+
+                if (imageFiles.Any())
+                {
+                    var fileName = Path.GetFileName(imageFiles.First());
+                    return $"/content/users/{username.ToLowerInvariant()}/profilepicture/{fileName}";
+                }
+            }
+            return null;
+        }
         
          private string GetCategoryPath(Guid id)
         {
@@ -229,6 +249,10 @@ namespace FileBlogSystem.Services
                 if (File.Exists(profileFilePath))
                 {
                     var user = await ReadJsonFileAsync<UserResponse>(profileFilePath);
+                    if (user != null)
+                    {
+                        user.ProfilePictureUrl = GetProfilePictureUrl(username);
+                    }
                     return user;
                 }
             }
@@ -712,39 +736,29 @@ namespace FileBlogSystem.Services
             }
         }
 
-        public async Task<List<UserResponse>> GetAllUsersAsync()
-        {
-            var users = new List<UserResponse>();
-            try
-            {
-                if (!Directory.Exists(_usersFolderPath))
-                {
-                    Directory.CreateDirectory(_usersFolderPath);
-                    return users;
-                }
-
-                var userDirs = Directory.EnumerateDirectories(_usersFolderPath, "*", SearchOption.TopDirectoryOnly);
-
-                foreach (var userDirPath in userDirs)
-                {
-                    var profileFilePath = Path.Combine(userDirPath, "profile.json");
-                    if (File.Exists(profileFilePath))
-                    {
-                        var user = await ReadJsonFileAsync<UserResponse>(profileFilePath);
-                        if (user != null)
-                        {
-                            users.Add(user);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error reading users from {_usersFolderPath}.");
-            }
-            return users.OrderBy(u => u.Username).ToList(); 
-        }
-
+       public async Task<List<UserResponse>> GetAllUsersAsync()
+       {
+           var users = new List<UserResponse>();
+       
+           if (!Directory.Exists(_usersFolderPath)) return users;
+       
+           foreach (var userDir in Directory.GetDirectories(_usersFolderPath))
+           {
+               var profileFilePath = Path.Combine(userDir, "profile.json");
+               if (File.Exists(profileFilePath))
+               {
+                   var user = await ReadJsonFileAsync<UserResponse>(profileFilePath);
+                   if (user != null)
+                   {
+                       user.ProfilePictureUrl = GetProfilePictureUrl(user.Username);
+                       users.Add(user);
+                   }
+               }
+           }
+       
+           return users.OrderBy(u => u.Username).ToList(); 
+       }
+       
         public async Task<UserResponse?> CreateUserAsync(CreateUserRequest request)
         {
             try
@@ -766,7 +780,8 @@ namespace FileBlogSystem.Services
                     Username = username,
                     Email = request.Email.Trim(),
                     HashedPassword = hashedPassword,
-                    Roles = request.Roles ?? ["Author"]
+                    Roles = request.Roles ?? ["Author"],
+                    ProfilePictureUrl = null
                 };
 
                 var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
@@ -807,11 +822,68 @@ namespace FileBlogSystem.Services
                 }
 
                 existingUser.Email = request.Email.Trim();
+                existingUser.Roles = request.Roles ?? new List<string>();
+
                 if (!string.IsNullOrEmpty(request.HashedPassword))
                 {
                     existingUser.HashedPassword = request.HashedPassword.Trim();
+                } 
+
+                 if (!string.IsNullOrEmpty(request.ProfilePictureBase64) && !string.IsNullOrEmpty(request.ProfilePictureFileName))
+                {
+                    var profilePictureDir = Path.Combine(userDir, "profilepicture");
+                    Directory.CreateDirectory(profilePictureDir);
+
+                    foreach (var file in Directory.GetFiles(profilePictureDir))
+                    {
+                        File.Delete(file);
+                    }
+
+                    var fileExtension = Path.GetExtension(request.ProfilePictureFileName);
+                    if (string.IsNullOrEmpty(fileExtension) || !Regex.IsMatch(fileExtension, @"\.(jpg|jpeg|png|gif|bmp|webp)$", RegexOptions.IgnoreCase))
+                    {
+                        _logger.LogWarning($"Invalid or missing file extension for profile picture: {request.ProfilePictureFileName}");
+                        fileExtension = ".png";
+                    }
+
+                    var profilePicturePath = Path.Combine(profilePictureDir, $"profile{fileExtension}"); // Standardize filename
+
+                    try
+                    {
+                        string base64Data = request.ProfilePictureBase64;
+                        if (base64Data.Contains(","))
+                        {
+                            base64Data = base64Data.Substring(base64Data.IndexOf(',') + 1);
+                        }
+
+                        var imageBytes = Convert.FromBase64String(base64Data);
+                        await File.WriteAllBytesAsync(profilePicturePath, imageBytes);
+                        _logger.LogInformation($"Profile picture saved for user: {username}");
+
+                        existingUser.ProfilePictureUrl = GetProfilePictureUrl(username);
+                    }
+                    catch (FormatException ex)
+                    {
+                        _logger.LogError(ex, "Invalid Base64 string for profile picture.");
+                        existingUser.ProfilePictureUrl = GetProfilePictureUrl(username);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Error saving profile picture for user: {username}");
+                        existingUser.ProfilePictureUrl = GetProfilePictureUrl(username); 
+                        existingUser.ProfilePictureUrl = GetProfilePictureUrl(username); 
+                    }
                 }
-                existingUser.Roles = request.Roles ?? new List<string>(); 
+                 else if (request.ProfilePictureBase64 == null && request.ProfilePictureFileName == null && existingUser.ProfilePictureUrl != null)
+                {
+                    var profilePictureDir = Path.Combine(userDir, "profilepicture");
+                    if (Directory.Exists(profilePictureDir))
+                    {
+                        Directory.Delete(profilePictureDir, recursive: true);
+                        _logger.LogInformation($"Profile picture directory deleted for user: {username}");
+                    }
+                    existingUser.ProfilePictureUrl = null;
+                }
 
                 var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
                 var json = JsonSerializer.Serialize(existingUser, jsonOptions);
