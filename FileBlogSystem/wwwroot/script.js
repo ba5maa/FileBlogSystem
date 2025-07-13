@@ -189,7 +189,6 @@ document.addEventListener("DOMContentLoaded", () => {
       TAGS = []
     }
   }
-  
 
   function renderAuthForm(type = "login") {
     appContainer.innerHTML = `
@@ -277,32 +276,89 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     setupSwitchLink()
 
+    function showFieldError(fieldId, message) {
+      const field = document.getElementById(fieldId)
+      const existingError = field.parentNode.querySelector(".field-error")
+      if (existingError) {
+        existingError.remove()
+      }
+
+      if (message) {
+        const errorDiv = document.createElement("div")
+        errorDiv.className = "field-error"
+        errorDiv.style.color = "#dc3545"
+        errorDiv.style.fontSize = "12px"
+        errorDiv.style.marginTop = "4px"
+        errorDiv.textContent = message
+        field.parentNode.appendChild(errorDiv)
+        field.style.borderColor = "#dc3545"
+      } else {
+        field.style.borderColor = ""
+      }
+    }
+
+    function clearFieldErrors() {
+      document.querySelectorAll(".field-error").forEach((error) => error.remove())
+      document.querySelectorAll("input").forEach((input) => (input.style.borderColor = ""))
+    }
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault()
       showMessage("", "", messageElement)
+      clearFieldErrors()
 
       const usernameInput = document.getElementById("username")
       const passwordInput = document.getElementById("password")
 
       const credentials = {
-        username: usernameInput.value,
+        username: usernameInput.value.trim(),
         password: passwordInput.value,
         roles: ["Author"],
+      }
+
+      if (currentType === "login") {
+        if (!credentials.username.trim()) {
+          showFieldError("username", "Username is required")
+          return
+        }
+        if (!credentials.password) {
+          showFieldError("password", "Password is required")
+          return
+        }
+      } else {
+        const confirmPasswordInput = document.getElementById("confirm-password")
+        const emailInput = document.getElementById("email")
+
+        if (!credentials.username.trim()) {
+          showFieldError("username", "Username is required")
+          return
+        }
+        if (!credentials.password) {
+          showFieldError("password", "Password is required")
+          return
+        }
+        if (credentials.password !== confirmPasswordInput.value) {
+          showFieldError("confirm-password", "Passwords do not match")
+          return
+        }
+        if (!emailInput.value.trim()) {
+          showFieldError("email", "Email is required")
+          return
+        }
+
+        if (!emailInput.value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim())) {
+          showFieldError("email", "Please enter a valid email address")
+          isValid = false
+          return
+        }
+
+        credentials.email = emailInput.value.trim()
       }
 
       let endpoint = ""
       if (currentType === "login") {
         endpoint = `${API_BASE_URL}/api/auth/login`
       } else {
-        const confirmPasswordInput = document.getElementById("confirm-password")
-        const emailInput = document.getElementById("email")
-        //const roleSelect = "Author";
-
-        if (credentials.password !== confirmPasswordInput.value) {
-          showMessage("Passwords do not match.", "error", messageElement)
-          return
-        }
-        credentials.email = emailInput.value
         endpoint = `${API_BASE_URL}/api/users`
       }
 
@@ -318,14 +374,34 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await response.json()
 
         if (!response.ok) {
-          const errorMessage = data.errors
-            ? Object.values(data.errors).flat().join("; ")
-            : data.detail || data.message || `API Error: ${response.statusText}`
-          throw new Error(errorMessage)
+          if (response.status === 401 && currentType === "login") {
+            showFieldError("username", "Invalid username or password")
+            showFieldError("password", "Invalid username or password")
+            showMessage("Please check your credentials and try again.", "error", messageElement)
+          } else if (response.status === 409 && currentType === "signup") {
+            showFieldError("username", "This username is already taken")
+            showMessage("Please choose a different username.", "error", messageElement)
+          } else {
+            const errorMessage = data.errors
+              ? Object.values(data.errors).flat().join("; ")
+              : data.detail || data.message || `API Error: ${response.statusText}`
+
+            if (data.errors) {
+              Object.keys(data.errors).forEach((field) => {
+                const fieldId = field.toLowerCase()
+                if (document.getElementById(fieldId)) {
+                  showFieldError(fieldId, data.errors[field][0])
+                }
+              })
+            }
+
+            showMessage(errorMessage, "error", messageElement)
+          }
+          return
         }
 
         if (currentType === "login") {
-           try {
+          try {
             const userResponse = await fetch(`${API_BASE_URL}/api/users/${data.user.username}`, {
               headers: { Authorization: `Bearer ${data.token}` },
             })
@@ -342,49 +418,54 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           } catch (error) {
             user = { username: data.user.username, roles: data.user.roles || ["Author"] }
-          }   
+          }
 
           token = data.token
           tokenExpires = new Date(data.expires)
           saveAuthData()
           renderAppContent()
         } else {
-          showMessage("Account created successfully! Signing you in...", "success", messageElement)
-          setTimeout(async () => {
-            try {
-              const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  username: credentials.username,
-                  password: credentials.password,
-                }),
-              })
+          try {
+            const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                username: credentials.username,
+                password: credentials.password,
+              }),
+            })
 
-              const loginData = await loginResponse.json()
+            const loginData = await loginResponse.json()
 
-              if (loginResponse.ok) {
-                user = { username: loginData.user.username, roles: loginData.user.roles || ["Author"] }
-                token = loginData.token
-                tokenExpires = new Date(loginData.expires)
-                saveAuthData()
-                renderAppContent()
-              } else {
-                showMessage("Account created! Please sign in manually.", "success", messageElement)
-              }
-            } catch (error) {
-              showMessage(
-                `Account created! Auto-login failed: ${error.message}. Please sign in manually.`,
-                "error",
-                messageElement,
-              )
+            if (loginResponse.ok) {
+              user = { username: loginData.user.username, roles: loginData.user.roles || ["Author"] }
+              token = loginData.token
+              tokenExpires = new Date(loginData.expires)
+              saveAuthData()
+              renderAppContent()
+            } else {
+              throw new Error("Auto-login failed")
             }
-          }, 1500)
+          } catch (error) {
+            console.error("Auto-login error:", error)
+            showMessage("Account created successfully! Please sign in.", "success", messageElement)
+            setTimeout(() => {
+              currentType = "login"
+              signupFields.style.display = "none"
+              authTitle.textContent = "Welcome Back"
+              authSubtitle.textContent = "Sign in to your account"
+              submitText.textContent = "Sign In"
+              authSwitchTextContainer.innerHTML =
+                'Don\'t have an account? <a href="#" id="auth-switch-link">Sign Up</a>'
+              setupSwitchLink()
+              messageElement.style.display = "none"
+            }, 2000)
+          }
         }
       } catch (error) {
-        showMessage(error.message, "error", messageElement)
+        showMessage("Network error. Please check your connection and try again.", "error", messageElement)
       }
     })
   }
@@ -1580,40 +1661,39 @@ document.addEventListener("DOMContentLoaded", () => {
                </div>
             `
 
-          document.getElementById("profile-dropdown").addEventListener("click", (e) => {
-            e.stopPropagation()
-            document.getElementById("profile-menu").classList.toggle("show")
-          })
-    
-          document.addEventListener("click", () => {
-            document.getElementById("profile-menu").classList.remove("show")
-          })
-    
-          document.getElementById("edit-profile-btn").addEventListener("click", (e) => {
-            e.preventDefault()
-            showEditProfileModal()
-          })
-    
-          document.getElementById("change-password-btn").addEventListener("click", (e) => {
-            e.preventDefault()
-            showChangePasswordModal()
-          })
-    
-          document.getElementById("nav-logout").addEventListener("click", () => {
-            clearAuthData()
-            currentPage = "feed"
-            renderAppContent()
-          })
+      document.getElementById("profile-dropdown").addEventListener("click", (e) => {
+        e.stopPropagation()
+        document.getElementById("profile-menu").classList.toggle("show")
+      })
 
-           document.querySelectorAll(".nav-btn[data-page]").forEach((btn) => {
-            btn.addEventListener("click", () => {
-              currentPage = btn.dataset.page
-              renderAppContent()
-            })
-          })
-    
-        } else {
-          mainNav.innerHTML = `
+      document.addEventListener("click", () => {
+        document.getElementById("profile-menu").classList.remove("show")
+      })
+
+      document.getElementById("edit-profile-btn").addEventListener("click", (e) => {
+        e.preventDefault()
+        showEditProfileModal()
+      })
+
+      document.getElementById("change-password-btn").addEventListener("click", (e) => {
+        e.preventDefault()
+        showChangePasswordModal()
+      })
+
+      document.getElementById("nav-logout").addEventListener("click", () => {
+        clearAuthData()
+        currentPage = "feed"
+        renderAppContent()
+      })
+
+      document.querySelectorAll(".nav-btn[data-page]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          currentPage = btn.dataset.page
+          renderAppContent()
+        })
+      })
+    } else {
+      mainNav.innerHTML = `
                     <button class="nav-btn ${currentPage === "login" ? "active" : ""}" data-page="login" id="nav-login">
                         <i class="fas fa-sign-in-alt"></i> Login
                     </button>
@@ -1621,19 +1701,18 @@ document.addEventListener("DOMContentLoaded", () => {
                         <i class="fas fa-user-plus"></i> Sign Up
                     </button>
                 `
-          document.getElementById("nav-login").addEventListener("click", () => {
-            currentPage = "login"
-            renderAuthForm("login")
-          })
-          document.getElementById("nav-signup").addEventListener("click", () => {
-            currentPage = "signup"
-            renderAuthForm("signup")
-          })
-        }
-      }
+      document.getElementById("nav-login").addEventListener("click", () => {
+        currentPage = "login"
+        renderAuthForm("login")
+      })
+      document.getElementById("nav-signup").addEventListener("click", () => {
+        currentPage = "signup"
+        renderAuthForm("signup")
+      })
+    }
+  }
 
-
-   function showEditProfileModal() {
+  function showEditProfileModal() {
     const modalHtml = `
     <div class="modal-overlay" id="edit-profile-modal">
       <div class="modal-content">
@@ -1660,6 +1739,9 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
           </div>
           <div class="modal-actions">
+          <button class="btn btn-danger btn-sm delete-user-btn" data-username="${user.username}">
+                <i class="fas fa-trash"></i> Delete account
+              </button>
             <button type="button" class="btn btn-outline" id="cancel-edit-profile">Cancel</button>
             <button type="submit" class="btn btn-primary">Update Profile</button>
           </div>
@@ -1675,6 +1757,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("edit-profile-form")
     const closeBtn = document.getElementById("close-edit-profile-modal")
     const cancelBtn = document.getElementById("cancel-edit-profile")
+    const deleteUserBtn = document.querySelector(".delete-user-btn")
     const messageElement = document.getElementById("edit-profile-message")
 
     const closeModal = () => modal.remove()
@@ -1683,6 +1766,35 @@ document.addEventListener("DOMContentLoaded", () => {
     cancelBtn.addEventListener("click", closeModal)
     modal.addEventListener("click", (e) => {
       if (e.target === modal) closeModal()
+    })
+
+    deleteUserBtn.addEventListener("click", async (e) => {
+      e.preventDefault()
+
+      const username = deleteUserBtn.dataset.username
+
+      if (confirm(`Are you sure you want to delete your account ${username}?`)) {
+      try {
+        const response = await fetchAuthenticated(`${API_BASE_URL}/api/users/${username}`, {
+        method: "DELETE",
+        })
+
+        if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to delete account")
+        }
+
+        showMessage("Account deleted successfully!", "success", messageElement)
+        setTimeout(() => {
+          closeModal()
+          clearAuthData()
+          currentPage = "feed"
+          renderAppContent()
+        }, 1500)
+      } catch (error) {
+        showMessage(error.message, "error", messageElement)
+      }
+      }
     })
 
     form.addEventListener("submit", async (e) => {
@@ -1789,7 +1901,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       try {
-        // First verify current password by attempting login
         const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1803,7 +1914,6 @@ document.addEventListener("DOMContentLoaded", () => {
           throw new Error("Current password is incorrect")
         }
 
-        // Update password
         const response = await fetchAuthenticated(`${API_BASE_URL}/api/users/${user.username}`, {
           method: "PUT",
           body: JSON.stringify({
