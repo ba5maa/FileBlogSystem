@@ -6,6 +6,7 @@ using System.Text;
 using System.Security.Claims; 
 using FileBlogSystem.Security;
 using Microsoft.AspNetCore.Mvc;
+using FileBlogSystem.Constants;
 
 namespace FileBlogSystem.Endpoints
 {
@@ -18,9 +19,9 @@ namespace FileBlogSystem.Endpoints
             {
                 var postMetas = await contentService.GetAllBlogPostsMetaAsync();
                 var posts = new List<object>();
-                var filteredPosts = postMetas.AsEnumerable();
+                var filteredPosts = postMetas.AsQueryable();
 
-                if (isDraft == true && searchTerm == "scheduled")
+                if (isDraft == true && searchTerm == EndpointConstants.Scheduled)
                 {
                     filteredPosts = filteredPosts.Where(p => p.ScheduledFor.HasValue && p.ScheduledFor.Value > DateTime.UtcNow);
                 }
@@ -36,18 +37,18 @@ namespace FileBlogSystem.Endpoints
 
                 if (!string.IsNullOrEmpty(authorUsername))
                 {
-                    filteredPosts = filteredPosts.Where(p => p.AuthorUsername.Equals(authorUsername, StringComparison.OrdinalIgnoreCase));
+                    filteredPosts = filteredPosts.Where(p => p.AuthorUsername.ToLower() == authorUsername.ToLower());
                 }
 
 
                 if (!string.IsNullOrEmpty(searchTerm))
                 {
                     var lowerSearchTerm = searchTerm.ToLowerInvariant();
-                    filteredPosts = filteredPosts.Where(p =>
-                        p.Title.ToLowerInvariant().Contains(lowerSearchTerm) ||
-                        p.Description.ToLowerInvariant().Contains(lowerSearchTerm) ||
-                        p.Content?.ToLowerInvariant().Contains(lowerSearchTerm) == true ||
-                        p.AuthorUsername.ToLowerInvariant().Contains(lowerSearchTerm));
+                    var result = filteredPosts.ToList().Where(p =>
+                    (p.Title?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false) ||
+                    (p.Description?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false) ||
+                    (p.Content?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false) ||
+                    (p.AuthorUsername?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false));
                 }
 
                 if (!string.IsNullOrEmpty(tag) && Guid.TryParse(tag, out Guid tagId))
@@ -55,14 +56,13 @@ namespace FileBlogSystem.Endpoints
                     filteredPosts = filteredPosts.Where(p => p.Tags != null && p.Tags.Contains(tagId));
                 }
 
-                // if (!string.IsNullOrEmpty(category))
-                // {
-                //     var lowerCategory = category.ToLowerInvariant();
-                //     filteredPosts = filteredPosts.Where(p => p.Categories != null && p.Categories.Any(c => c.ToLowerInvariant() == lowerCategory));
-                // }
-
                 foreach (var meta in filteredPosts)
                 {
+                    if (string.IsNullOrEmpty(meta.PostFolderPath))
+                     {
+                         continue;
+                     }
+
                     var content = await contentService.GetBlogPostContentAsync(meta.PostFolderPath!);
                     posts.Add(new
                     {
@@ -88,15 +88,15 @@ namespace FileBlogSystem.Endpoints
                 return Results.Ok(posts);
             })
             .RequireAuthorization()
-            .WithName("GetAllPosts")
+            .WithName(EndpointConstants.GetAllPosts)
             .Produces<List<BlogPostMetaResponse>>(StatusCodes.Status200OK);
 
-            app.MapGet("/api/posts/{slug}", async (string slug, IFileContentService contentService) =>
+            app.MapGet("/api/post/{slug}", async (string slug, IFileContentService contentService) =>
             {
                 var postMeta = await contentService.GetBlogPostMetaBySlugAsync(slug);
                 if (postMeta == null)
                 {
-                    return Results.NotFound($"post-with-slug-'{slug}'-not-found");
+                    return Results.NotFound(string.Format(EndpointConstants.PostNotFoundWithSlug, slug));
                 }
 
                 var content = await contentService.GetBlogPostContentAsync(postMeta.PostFolderPath!);
@@ -124,7 +124,7 @@ namespace FileBlogSystem.Endpoints
                 });
             })
             .RequireAuthorization()
-            .WithName("GetPostBySlug")
+            .WithName(EndpointConstants.GetPostBySlug)
             .Produces<object>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status500InternalServerError);
@@ -135,20 +135,21 @@ namespace FileBlogSystem.Endpoints
                 var categories = await contentService.GetAllCategoriesAsync();
                 return Results.Ok(categories);
             })
-            .WithName("GetAllCategories")
+            .RequireAuthorization()
+            .WithName(EndpointConstants.GetAllCategories)
             .Produces<List<CategoryResponse>>(StatusCodes.Status200OK);
 
-            app.MapGet("/api/categories/{id:guid}", async (Guid id, IFileContentService contentService) =>
+            app.MapGet("/api/category/{id:guid}", async (Guid id, IFileContentService contentService) =>
             {
-                var categories = await contentService.GetAllCategoriesAsync();
-                var category = categories.FirstOrDefault(c => c.Id == id);
+                var category = await contentService.GetCategoryByIdAsync(id);
                 if (category == null)
                 {
-                    return Results.NotFound($"category-with-id-'{id}'-not-found");
+                    return Results.NotFound(string.Format(EndpointConstants.CategoryNotFound, id));
                 }
                 return Results.Ok(category);
             })
-            .WithName("GetCategoryById")
+            .RequireAuthorization()
+            .WithName(EndpointConstants.GetCategoryById)
             .WithOpenApi();
 
             app.MapGet("/api/tags", async (IFileContentService contentService) =>
@@ -156,33 +157,34 @@ namespace FileBlogSystem.Endpoints
                 var tags = await contentService.GetAllTagsAsync();
                 return Results.Ok(tags);
             })
-            .WithName("GetAllTags")
+            .RequireAuthorization()
+            .WithName(EndpointConstants.GetAllTags)
             .Produces<List<TagResponse>>(StatusCodes.Status200OK);
 
-            app.MapGet("/api/tags/{id:guid}", async (Guid id, IFileContentService contentService) => // Change to Guid id
+            app.MapGet("/api/tag/{id:guid}", async (Guid id, IFileContentService contentService) =>
             {
-                var tags = await contentService.GetAllTagsAsync();
-                var tag = tags.FirstOrDefault(t => t.Id == id);
+                var tag = await contentService.GetTagByIdAsync(id);
                 if (tag == null)
                 {
-                    return Results.NotFound($"tag-with-id-'{id}'-not-found");
+                    return Results.NotFound(string.Format(EndpointConstants.TagNotFound, id));
                 }
                 return Results.Ok(tag);
             })
-            .WithName("GetTagById")
+            .RequireAuthorization()
+            .WithName(EndpointConstants.GetTagById)
             .WithOpenApi();
 
-            app.MapGet("/api/users/{username}", async (string username, IFileContentService contentService) =>
+            app.MapGet("/api/user/{username}", async (string username, IFileContentService contentService) =>
             {
                 var user = await contentService.GetUserByUsernameAsync(username);
                 if (user == null)
                 {
-                    return Results.NotFound($"user-with-username-'{username}'-not-found");
+                    return Results.NotFound(string.Format(EndpointConstants.UserNotFound, username));
                 }
                 return Results.Ok(user);
             })
             .RequireAuthorization()
-            .WithName("GetUserByUsername")
+            .WithName(EndpointConstants.GetUserByUsername)
             .Produces<UserResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
@@ -195,14 +197,14 @@ namespace FileBlogSystem.Endpoints
                 var user = await contentService.GetUserByUsernameAsync(request.Username);
                 if (user == null)
                 {
-                    return Results.Json(new { message = "Invalid username or password" }, statusCode: 401);
+                    return Results.Json(new { message = string.Format(EndpointConstants.InvalidUsernameOrPassword) }, statusCode: 401);
                 }
 
                 Console.WriteLine($"User found: {user.Username}. Stored hash: {user.HashedPassword}");
 
                 if (!PasswordHasher.VerifyPassword(request.Password, user.HashedPassword))
                 {
-                    return Results.Json(new { message = "Invalid username or password" }, statusCode: 401);
+                    return Results.Json(new { message = string.Format(EndpointConstants.InvalidUsernameOrPassword) }, statusCode: 401);
                 }
 
                 Console.WriteLine($"Login successful for user: {user.Username}. Generating token...");
@@ -222,9 +224,12 @@ namespace FileBlogSystem.Endpoints
                     new Claim(ClaimTypes.Name, user.Username)
 
                 };
-                foreach (var role in user.Roles)
+                if (user.Roles != null)
                 {
-                    claims.Add(new Claim(ClaimTypes.Role, role));
+                    foreach (var role in user.Roles)
+                    {
+                        claims.Add(new Claim(ClaimTypes.Role, role));
+                    }
                 }
 
                 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
@@ -246,7 +251,7 @@ namespace FileBlogSystem.Endpoints
                     User = new { user.Username, user.Email, user.Roles }
                 });
             })
-            .WithName("Login")
+            .WithName(EndpointConstants.Login)
             .Produces<object>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Accepts<LoginRequest>("application/json");
@@ -257,7 +262,7 @@ namespace FileBlogSystem.Endpoints
                 return Results.Ok($"hello,-{user.Identity?.Name}-!-you-are-authenticated");
             })
             .RequireAuthorization()
-            .WithName("GetProtectedData")
+            .WithName(EndpointConstants.GetProtectedData)
             .Produces<string>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized);
 
@@ -266,22 +271,22 @@ namespace FileBlogSystem.Endpoints
             {
                 return Results.Ok($"welcome-admin-{user.Identity?.Name}-!-You-have-access-to-admin-info");
             })
-            .RequireAuthorization(policyBuilder => policyBuilder.RequireRole("Admin"))
-            .WithName("GetAdminInfo")
+            .RequireAuthorization(policyBuilder => policyBuilder.RequireRole(EndpointConstants.Admin))
+            .WithName(EndpointConstants.GetAdminInfo)
             .Produces<string>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
 
-            app.MapPost("/api/posts", async (CreateBlogPostRequest request, IFileContentService contentService, ClaimsPrincipal user) =>
+            app.MapPost("/api/post", async (CreateBlogPostRequest request, IFileContentService contentService, ClaimsPrincipal user) =>
             {
-                if (!user.IsInRole("Admin") && !user.IsInRole("Author"))
+                if (!user.IsInRole(EndpointConstants.Admin) && !user.IsInRole(EndpointConstants.Author))
                 {
                     return Results.Forbid();
                 }
 
                 if (string.IsNullOrEmpty(request.Title) || string.IsNullOrEmpty(request.Content))
                 {
-                    return Results.BadRequest("title-and-content-are-required");
+                    return Results.BadRequest(string.Format(EndpointConstants.TitleContentRequired));
                 }
 
                 var newPostMeta = await contentService.CreateBlogPostAsync(request);
@@ -291,10 +296,10 @@ namespace FileBlogSystem.Endpoints
                     return Results.StatusCode(StatusCodes.Status500InternalServerError);
                 }
 
-                return Results.CreatedAtRoute("GetPostBySlug", new { slug = newPostMeta.Slug }, newPostMeta);
+                return Results.CreatedAtRoute(EndpointConstants.GetPostBySlug, new { slug = newPostMeta.Slug }, newPostMeta);
             })
             .RequireAuthorization()
-            .WithName("CreateBlogPost")
+            .WithName(EndpointConstants.CreateBlogPost)
             .Produces<BlogPostMetaResponse>(StatusCodes.Status201Created)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -302,16 +307,16 @@ namespace FileBlogSystem.Endpoints
             .Produces(StatusCodes.Status500InternalServerError)
             .Accepts<CreateBlogPostRequest>("application/json");
 
-            app.MapPut("/api/posts/{slug}", async (string slug, UpdateBlogPostRequest request, IFileContentService contentService, ClaimsPrincipal user) =>
+            app.MapPut("/api/update-post/{slug}", async (string slug, UpdateBlogPostRequest request, IFileContentService contentService, ClaimsPrincipal user) =>
             {
-                if (!user.IsInRole("Admin") && !user.IsInRole("Author"))
+                if (!user.IsInRole(EndpointConstants.Admin) && !user.IsInRole(EndpointConstants.Author))
                 {
                     return Results.Forbid();
                 }
 
                 if (string.IsNullOrEmpty(request.Title) || string.IsNullOrEmpty(request.Content))
                 {
-                    return Results.BadRequest("title-and-content-are-required-for-update");
+                    return Results.BadRequest(string.Format(EndpointConstants.TitleContentUpdateRequired));
                 }
 
                 var updatedPostMeta = await contentService.UpdateBlogPostAsync(slug, request);
@@ -319,13 +324,13 @@ namespace FileBlogSystem.Endpoints
                 if (updatedPostMeta == null)
                 {
 
-                    return Results.NotFound($"blog-post-with-slug-'{slug}'-not-found-or-could-not-be-updated.");
+                    return Results.NotFound(string.Format(EndpointConstants.PostNotFound, slug));
                 }
 
                 return Results.Ok(updatedPostMeta);
             })
             .RequireAuthorization()
-            .WithName("UpdateBlogPost")
+            .WithName(EndpointConstants.UpdateBlogPost)
             .Produces<BlogPostMetaResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -334,9 +339,9 @@ namespace FileBlogSystem.Endpoints
             .Produces(StatusCodes.Status500InternalServerError)
             .Accepts<UpdateBlogPostRequest>("application/json");
 
-            app.MapDelete("/api/posts/{slug}", async (string slug, IFileContentService contentService, ClaimsPrincipal user) =>
+            app.MapDelete("/api/delete-post/{slug}", async (string slug, IFileContentService contentService, ClaimsPrincipal user) =>
             {
-                if (!user.IsInRole("Admin"))
+                if (!user.IsInRole(EndpointConstants.Admin))
                 {
                     return Results.Forbid();
                 }
@@ -345,42 +350,42 @@ namespace FileBlogSystem.Endpoints
 
                 if (!deleted)
                 {
-                    return Results.NotFound($"blog-post-with-slug-'{slug}'-not-found-or-could-not-be-deleted");
+                    return Results.NotFound(string.Format(EndpointConstants.PostNotFound, slug));
                 }
 
                 return Results.NoContent();
             })
             .RequireAuthorization()
-            .WithName("DeleteBlogPost")
+            .WithName(EndpointConstants.DeleteBlogPost)
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status500InternalServerError);
 
-            app.MapPost("/api/categories", async (CreateCategoryRequest request, IFileContentService contentService, ClaimsPrincipal user) =>
+            app.MapPost("/api/category", async (CreateCategoryRequest request, IFileContentService contentService, ClaimsPrincipal user) =>
             {
-                if (!user.IsInRole("Admin") && !user.IsInRole("Author"))
+                if (!user.IsInRole(EndpointConstants.Admin) && !user.IsInRole(EndpointConstants.Author))
                 {
                     return Results.Forbid();
                 }
 
                 if (string.IsNullOrWhiteSpace(request.Name))
                 {
-                    return Results.BadRequest("category-name-cannot-be-empty");
+                    return Results.BadRequest(string.Format(EndpointConstants.CategoryNameEmpty));
                 }
 
                 var newCategory = await contentService.CreateCategoryAsync(request);
 
                 if (newCategory == null)
                 {
-                    return Results.Conflict($"category-'{request.Name}'-already-exists-or-could-not-be-created");
+                    return Results.Conflict(string.Format(EndpointConstants.CategoryAlreadyExists, request.Name));
                 }
 
-                return Results.CreatedAtRoute("GetAllCategories", new { }, newCategory);
+                return Results.CreatedAtRoute(EndpointConstants.GetAllCategories, new { }, newCategory);
             })
             .RequireAuthorization()
-            .WithName("CreateCategory")
+            .WithName(EndpointConstants.CreateCategory)
             .Produces<CategoryResponse>(StatusCodes.Status201Created)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -389,16 +394,16 @@ namespace FileBlogSystem.Endpoints
             .Produces(StatusCodes.Status500InternalServerError)
             .Accepts<CreateCategoryRequest>("application/json");
 
-            app.MapPut("/api/categories", async ( UpdateCategoryRequest request, IFileContentService contentService, ClaimsPrincipal user) =>
+            app.MapPut("/api/update-category", async ( UpdateCategoryRequest request, IFileContentService contentService, ClaimsPrincipal user) =>
             {
-                if (!user.IsInRole("Admin") && !user.IsInRole("Author"))
+                if (!user.IsInRole(EndpointConstants.Admin) && !user.IsInRole(EndpointConstants.Author))
                 {
                     return Results.Forbid();
                 }
 
                 if (string.IsNullOrWhiteSpace(request.NewName))
                 {
-                    return Results.BadRequest("new-category-name-cannot-be-empty");
+                    return Results.BadRequest(string.Format(EndpointConstants.NewCategoryNameEmpty));
                 }
 
                 var updatedCategory = await contentService.UpdateCategoryAsync(request.Id, request);
@@ -408,15 +413,15 @@ namespace FileBlogSystem.Endpoints
                     var categories = await contentService.GetAllCategoriesAsync();
                     if (categories.Any(c => c.Name.Equals(request.NewName, StringComparison.OrdinalIgnoreCase)))
                     {
-                        return Results.Conflict($"category-with-new-name-'{request.NewName}'-already-exists");
+                        return Results.Conflict(string.Format(EndpointConstants.CategoryAlreadyExistsByName, request.NewName));
                     }
-                    return Results.NotFound($"category-'{request.Id}'-not-found-or-could-not-be-updated");
+                    return Results.NotFound(string.Format(EndpointConstants.CategoryUpdateFailed, request.Id));
                 }
 
                 return Results.Ok(updatedCategory);
             })
             .RequireAuthorization()
-            .WithName("UpdateCategory")
+            .WithName(EndpointConstants.UpdateCategory)
             .Produces<CategoryResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -426,9 +431,9 @@ namespace FileBlogSystem.Endpoints
             .Produces(StatusCodes.Status500InternalServerError)
             .Accepts<UpdateCategoryRequest>("application/json");
 
-            app.MapDelete("/api/categories/{id:guid}", async (Guid id, IFileContentService contentService, ClaimsPrincipal user) =>
+            app.MapDelete("/api/delete-category/{id:guid}", async (Guid id, IFileContentService contentService, ClaimsPrincipal user) =>
             {
-                if (!user.IsInRole("Admin"))
+                if (!user.IsInRole(EndpointConstants.Admin))
                 {
                     return Results.Forbid();
                 }
@@ -437,13 +442,13 @@ namespace FileBlogSystem.Endpoints
 
                 if (!deleted)
                 {
-                    return Results.NotFound($"category-'{id}'-not-found-or-could-not-be-deleted");
+                    return Results.NotFound(string.Format(EndpointConstants.CategoryDeleteFailed, id));
                 }
 
                 return Results.NoContent();
             })
             .RequireAuthorization()
-            .WithName("DeleteCategory")
+            .WithName(EndpointConstants.DeleteCategory)
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
@@ -452,42 +457,43 @@ namespace FileBlogSystem.Endpoints
 
 
 
-            app.MapPost("/api/tags", async (CreateTagRequest request, IFileContentService contentService) =>
+            app.MapPost("/api/tag", async (CreateTagRequest request, IFileContentService contentService) =>
             {
                 var tag = await contentService.CreateTagAsync(request);
                 if (tag == null)
                 {
-                    return Results.Conflict("a-tag-with-this-name-already-exists-or-could-not-be-created");
+                    return Results.Conflict(string.Format(EndpointConstants.TagExistsOrCreateFailed));
                 }
-                return Results.CreatedAtRoute("GetAllTags", new { }, tag);
+                return Results.CreatedAtRoute(EndpointConstants.GetAllTags, new { }, tag);
             })
-            .WithName("CreateTag")
+            .RequireAuthorization()
+            .WithName(EndpointConstants.CreateTag)
             .WithOpenApi();
 
-            app.MapPut("/api/tags", async ( UpdateTagRequest request, IFileContentService contentService) =>
+            app.MapPut("/api/update-tag", async ( UpdateTagRequest request, IFileContentService contentService) =>
             {
                 var updatedTag = await contentService.UpdateTagAsync(request.Id, request);
                 if (updatedTag == null)
                 {
-                    return Results.NotFound($"tag-'{request.Id}'-not-found-or-could-not-be-updated");
+                    return Results.NotFound(string.Format(EndpointConstants.TagUpdateFailed, request.Id));
                 }
                 return Results.Ok(updatedTag);
             })
             .RequireAuthorization()
-            .WithName("UpdateTag")
+            .WithName(EndpointConstants.UpdateTag)
             .WithOpenApi();
 
-            app.MapDelete("/api/tags/{id:guid}", async (Guid id, IFileContentService contentService) =>
+            app.MapDelete("/api/delete-tag/{id:guid}", async (Guid id, IFileContentService contentService) =>
             {
                 var success = await contentService.DeleteTagAsync(id);
                 if (!success)
                 {
-                    return Results.NotFound($"tag-'{id}'-not-found-or-could-not-be-deleted");
+                    return Results.NotFound(string.Format(EndpointConstants.TagDeleteFailed, id));
                 }
                 return Results.NoContent();
             })
             .RequireAuthorization()
-            .WithName("DeleteTag")
+            .WithName(EndpointConstants.DeleteTag)
             .WithOpenApi();
 
             app.MapGet("/api/users", async (IFileContentService contentService) =>
@@ -496,23 +502,24 @@ namespace FileBlogSystem.Endpoints
                 return Results.Ok(users);
             })
             .RequireAuthorization()
-            .WithName("GetAllUsers")
+            .WithName(EndpointConstants.GetAllUsers)
             .WithOpenApi();
 
 
-            app.MapPost("/api/users", async (CreateUserRequest request, IFileContentService contentService) =>
+            app.MapPost("/api/user", async (CreateUserRequest request, IFileContentService contentService) =>
             {
                 var user = await contentService.CreateUserAsync(request);
                 if (user == null)
                 {
-                    return Results.Conflict("a-user-with-this-username-already-exists-or-could-not-be-created");
+                    return Results.Conflict(string.Format(EndpointConstants.UserExistsOrCreateFailed));
                 }
-                return Results.CreatedAtRoute("GetUserByUsername", new { username = user.Username }, user);
+                return Results.CreatedAtRoute(EndpointConstants.GetUserByUsername, new { username = user.Username }, user);
             })
-            .WithName("CreateUser")
+            .RequireAuthorization()
+            .WithName(EndpointConstants.CreateUser)
             .WithOpenApi();
 
-            app.MapPut("/api/users/{username}", async (string username, UpdateUserRequest request, IFileContentService contentService) =>
+            app.MapPut("/api/update-user/{username}", async (string username, UpdateUserRequest request, IFileContentService contentService) =>
             {
                  if (!string.IsNullOrEmpty(request.HashedPassword))
                 {
@@ -522,36 +529,41 @@ namespace FileBlogSystem.Endpoints
                 var updatedUser = await contentService.UpdateUserAsync(username, request);
                 if (updatedUser == null)
                 {
-                    return Results.NotFound($"user-'{username}'-not-found-or-could-not-be-updated");
+                    return Results.NotFound(string.Format(EndpointConstants.UserUpdateFailed, username));
                 }
 
                 return Results.Ok(updatedUser);
             })
             .RequireAuthorization()
-            .WithName("UpdateUser")
+            .WithName(EndpointConstants.UpdateUser)
             .WithOpenApi();
 
-            app.MapDelete("/api/users/{username}", async (string username, IFileContentService contentService) =>
+            app.MapDelete("/api/delete-user/{username}", async (string username, IFileContentService contentService) =>
             {
                 var success = await contentService.DeleteUserAsync(username);
                 if (!success)
                 {
-                    return Results.NotFound($"user-'{username}'-not-found-or-could-not-be-deleted");
+                    return Results.NotFound(string.Format(EndpointConstants.UserDeleteFailed, username));
                 }
                 return Results.NoContent();
             })
             .RequireAuthorization()
-            .WithName("DeleteUser")
+            .WithName(EndpointConstants.DeleteUser)
             .WithOpenApi();
 
-          app.MapPost("/api/posts/{postId}/like", async (Guid postId, ClaimsPrincipal user, IFileContentService contentService) =>
+          app.MapPost("/api/post/{postId}/like", async (Guid postId, ClaimsPrincipal user, IFileContentService contentService) =>
           {
               var username = user.Identity?.Name;
               if (string.IsNullOrEmpty(username)) return Results.Unauthorized();
           
               var post = await contentService.GetBlogPostMetaByIdAsync(postId);
-              if (post == null) return Results.NotFound("Post not found");
-          
+              if (post == null) return Results.NotFound(string.Format(EndpointConstants.PostNotFound, postId));
+
+              if (post.LikedByUsers == null)
+              {
+                  post.LikedByUsers = new List<string>();
+              }
+
               if (!post.LikedByUsers.Contains(username))
               {
                   post.LikedByUsers.Add(username);
@@ -561,16 +573,16 @@ namespace FileBlogSystem.Endpoints
               return updated ? Results.Ok(new { likedBy = post.LikedByUsers }) : Results.StatusCode(500);
           })
           .RequireAuthorization()
-          .WithName("LikePost");
-          
-          app.MapPost("/api/posts/{postId}/unlike", async (Guid postId, ClaimsPrincipal user, IFileContentService contentService) =>
+          .WithName(EndpointConstants.LikePost);
+
+          app.MapPost("/api/post/{postId}/unlike", async (Guid postId, ClaimsPrincipal user, IFileContentService contentService) =>
           {
               var username = user.Identity?.Name;
               if (string.IsNullOrEmpty(username)) return Results.Unauthorized();
           
               var post = await contentService.GetBlogPostMetaByIdAsync(postId);
-              if (post == null) return Results.NotFound("Post not found");
-          
+              if (post == null) return Results.NotFound(string.Format(EndpointConstants.PostNotFound, postId));
+
               if (post.LikedByUsers.Contains(username))
               {
                   post.LikedByUsers.Remove(username);
@@ -580,28 +592,28 @@ namespace FileBlogSystem.Endpoints
               return updated ? Results.Ok(new { likedBy = post.LikedByUsers }) : Results.StatusCode(500);
           })
           .RequireAuthorization()
-          .WithName("UnlikePost");
+          .WithName(EndpointConstants.UnlikePost);
 
-          app.MapGet("/api/posts/{slug}/comments", async (string slug, IFileContentService contentService) =>
+          app.MapGet("/api/post/{slug}/comments", async (string slug, IFileContentService contentService) =>
            {
                
                var comments = await contentService.GetCommentsAsync(slug);
                return Results.Ok(comments);
            })
            .RequireAuthorization()
-           .WithName("GetCommentsForPost")
+           .WithName(EndpointConstants.GetCommentsForPost)
            .Produces<List<CommentModel>>(StatusCodes.Status200OK);
                        
-            app.MapPost("/api/posts/{slug}/comments", async (string slug, CommentModel input, ClaimsPrincipal user, IFileContentService contentService) =>
+            app.MapPost("/api/post/{slug}/comment", async (string slug, CommentModel input, ClaimsPrincipal user, IFileContentService contentService) =>
             {
-                input.Username = user.Identity?.Name ?? "anonymous";
+                input.Username = user.Identity?.Name ?? EndpointConstants.AnonymousUser;
                 input.CreatedAt = DateTime.UtcNow;
             
                 var success = await contentService.AddCommentAsync(slug, input);
-                return success ? Results.Ok(input) : Results.NotFound("post-not-found");
+                return success ? Results.Ok(input) : Results.NotFound(string.Format(EndpointConstants.PostNotFound, slug));
             })
             .RequireAuthorization()
-            .WithName("AddComment")
+            .WithName(EndpointConstants.AddComment)
             .Produces<CommentModel>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
             

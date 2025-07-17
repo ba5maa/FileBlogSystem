@@ -52,7 +52,7 @@ namespace FileBlogSystem.Services
             }
         }
 
-         private string? GetProfilePictureUrl(string username)
+        private string? GetProfilePictureUrl(string username)
         {
             var userDir = Path.Combine(_usersFolderPath, username.ToLowerInvariant());
             var profilePictureDir = Path.Combine(userDir, "profilepicture");
@@ -71,8 +71,8 @@ namespace FileBlogSystem.Services
             }
             return null;
         }
-        
-         private string GetCategoryPath(Guid id)
+
+        private string GetCategoryPath(Guid id)
         {
             return Path.Combine(_categoriesFolderPath, $"{id}.json");
         }
@@ -176,21 +176,21 @@ namespace FileBlogSystem.Services
                     return categories;
                 }
 
-            var categoryFiles = Directory.GetFiles(_categoriesFolderPath, "*.json");
+                var categoryFiles = Directory.GetFiles(_categoriesFolderPath, "*.json");
 
                 foreach (var filePath in categoryFiles)
                 {
                     var category = await ReadJsonFileAsync<CategoryResponse>(filePath);
                     if (category != null)
                     {
-                         if (category.Id == Guid.Empty)
-                         {
-                             var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
-                             if (Guid.TryParse(fileNameWithoutExtension, out Guid fileId))
-                             {
-                                 category.Id = fileId;
-                             }
-                         }
+                        if (category.Id == Guid.Empty)
+                        {
+                            var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
+                            if (Guid.TryParse(fileNameWithoutExtension, out Guid fileId))
+                            {
+                                category.Id = fileId;
+                            }
+                        }
                         categories.Add(category);
                     }
                 }
@@ -213,7 +213,7 @@ namespace FileBlogSystem.Services
                     return tags;
                 }
 
-                 var tagFiles = Directory.GetFiles(_tagsFolderPath, "*.json");
+                var tagFiles = Directory.GetFiles(_tagsFolderPath, "*.json");
 
                 foreach (var filePath in tagFiles)
                 {
@@ -221,13 +221,13 @@ namespace FileBlogSystem.Services
                     if (tag != null)
                     {
                         if (tag.Id == Guid.Empty) // Check if ID was not deserialized
-                         {
-                             var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
-                             if (Guid.TryParse(fileNameWithoutExtension, out Guid fileId))
-                             {
-                                 tag.Id = fileId;
-                             }
-                         }
+                        {
+                            var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
+                            if (Guid.TryParse(fileNameWithoutExtension, out Guid fileId))
+                            {
+                                tag.Id = fileId;
+                            }
+                        }
                         tags.Add(tag);
                     }
                 }
@@ -271,7 +271,7 @@ namespace FileBlogSystem.Services
                                ? GenerateSlug(request.CustomUrl)
                                : GenerateSlug(request.Title);
 
-                 
+
                 var datePrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
                 var postFolderName = $"{datePrefix}-{baseSlug}";
                 var postFolderPath = Path.Combine(_contentRootPath, "posts", postFolderName);
@@ -301,7 +301,7 @@ namespace FileBlogSystem.Services
                     IsDraft = request.IsDraft,
                     ScheduledFor = request.ScheduledFor
                 };
-                
+
                 if (!string.IsNullOrEmpty(request.Base64Image))
                 {
                     var imageFileName = await SaveBase64ImageAsync(postFolderPath, request.Base64Image);
@@ -311,13 +311,13 @@ namespace FileBlogSystem.Services
                     }
                 }
 
-               
+
                 var metaFilePath = Path.Combine(postFolderPath, "meta.json");
                 var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
                 var metaJson = JsonSerializer.Serialize(newPostMeta, jsonOptions);
                 await File.WriteAllTextAsync(metaFilePath, metaJson);
 
-        
+
                 var contentFilePath = Path.Combine(postFolderPath, "content.md");
                 await File.WriteAllTextAsync(contentFilePath, request.Content);
 
@@ -339,7 +339,7 @@ namespace FileBlogSystem.Services
                 var base64Data = Regex.Replace(base64Image, @"^data:image\/(png|jpeg|jpg|gif);base64,", "", RegexOptions.IgnoreCase);
                 byte[] imageBytes = Convert.FromBase64String(base64Data);
 
-                string fileExtension = ".png"; 
+                string fileExtension = ".png";
                 if (base64Image.Contains("image/jpeg")) fileExtension = ".jpeg";
                 else if (base64Image.Contains("image/jpg")) fileExtension = ".jpg";
                 else if (base64Image.Contains("image/gif")) fileExtension = ".gif";
@@ -365,9 +365,9 @@ namespace FileBlogSystem.Services
         private string GenerateSlug(string title)
         {
             var slug = title.ToLowerInvariant();
-            slug = Regex.Replace(slug, @"[^a-z0-9\s-]", ""); 
-            slug = Regex.Replace(slug, @"\s+", "-").Trim(); 
-            slug = Regex.Replace(slug, @"-+", "-"); 
+            slug = Regex.Replace(slug, @"[^a-z0-9\s-]", "");
+            slug = Regex.Replace(slug, @"\s+", "-").Trim();
+            slug = Regex.Replace(slug, @"-+", "-");
             return slug;
         }
 
@@ -432,7 +432,7 @@ namespace FileBlogSystem.Services
             existingPostMeta.ScheduledFor = request.ScheduledFor;
 
 
- if (!string.IsNullOrEmpty(request.Base64Image))
+            if (!string.IsNullOrEmpty(request.Base64Image))
             {
 
                 if (!string.IsNullOrEmpty(existingPostMeta.ImageUrl))
@@ -525,7 +525,7 @@ namespace FileBlogSystem.Services
 
         public async Task<CategoryResponse?> CreateCategoryAsync(CreateCategoryRequest request)
         {
-              if (string.IsNullOrWhiteSpace(request.Name))
+            if (string.IsNullOrWhiteSpace(request.Name))
             {
                 _logger.LogWarning("Attempted to create category with empty name.");
                 return null;
@@ -552,7 +552,7 @@ namespace FileBlogSystem.Services
                 };
 
                 var filePath = Path.Combine(_categoriesFolderPath, $"{newCategory.Slug}.json"); // Use Slug for filename
-                var jsonOptions = new JsonSerializerOptions { WriteIndented = true , DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull};
+                var jsonOptions = new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
                 var json = JsonSerializer.Serialize(newCategory, jsonOptions);
                 await File.WriteAllTextAsync(categoryFilePath, json);
 
@@ -594,8 +594,8 @@ namespace FileBlogSystem.Services
                 await Task.Run(() => File.Delete(oldFilePath));
                 _logger.LogInformation($"Deleted old category file: {oldFilePath}");
             }
-            
-            await File.WriteAllTextAsync(newFilePath, json); 
+
+            await File.WriteAllTextAsync(newFilePath, json);
 
             _logger.LogInformation($"Category '{existingCategory.Name}' (ID: '{id}') updated successfully. File: {newFilePath}");
             return existingCategory;
@@ -671,7 +671,7 @@ namespace FileBlogSystem.Services
 
         public async Task<TagResponse?> UpdateTagAsync(Guid id, UpdateTagRequest request)
         {
-             var allTags = await GetAllTagsAsync();
+            var allTags = await GetAllTagsAsync();
             var existingTag = allTags.FirstOrDefault(t => t.Id == id);
 
             if (existingTag == null)
@@ -696,7 +696,7 @@ namespace FileBlogSystem.Services
                 await Task.Run(() => File.Delete(oldFilePath));
                 _logger.LogInformation($"Deleted old tag file: {oldFilePath}");
             }
-            
+
             await File.WriteAllTextAsync(newFilePath, json);
 
             _logger.LogInformation($"Tag '{existingTag.Name}' (ID: '{id}') updated successfully. File: {newFilePath}");
@@ -736,34 +736,34 @@ namespace FileBlogSystem.Services
             }
         }
 
-       public async Task<List<UserResponse>> GetAllUsersAsync()
-       {
-           var users = new List<UserResponse>();
-       
-           if (!Directory.Exists(_usersFolderPath)) return users;
-       
-           foreach (var userDir in Directory.GetDirectories(_usersFolderPath))
-           {
-               var profileFilePath = Path.Combine(userDir, "profile.json");
-               if (File.Exists(profileFilePath))
-               {
-                   var user = await ReadJsonFileAsync<UserResponse>(profileFilePath);
-                   if (user != null)
-                   {
-                       user.ProfilePictureUrl = GetProfilePictureUrl(user.Username);
-                       users.Add(user);
-                   }
-               }
-           }
-       
-           return users.OrderBy(u => u.Username).ToList(); 
-       }
-       
+        public async Task<List<UserResponse>> GetAllUsersAsync()
+        {
+            var users = new List<UserResponse>();
+
+            if (!Directory.Exists(_usersFolderPath)) return users;
+
+            foreach (var userDir in Directory.GetDirectories(_usersFolderPath))
+            {
+                var profileFilePath = Path.Combine(userDir, "profile.json");
+                if (File.Exists(profileFilePath))
+                {
+                    var user = await ReadJsonFileAsync<UserResponse>(profileFilePath);
+                    if (user != null)
+                    {
+                        user.ProfilePictureUrl = GetProfilePictureUrl(user.Username);
+                        users.Add(user);
+                    }
+                }
+            }
+
+            return users.OrderBy(u => u.Username).ToList();
+        }
+
         public async Task<UserResponse?> CreateUserAsync(CreateUserRequest request)
         {
             try
             {
-                var username = request.Username.Trim().ToLowerInvariant(); 
+                var username = request.Username.Trim().ToLowerInvariant();
                 var userDir = Path.Combine(_usersFolderPath, username);
                 var profileFilePath = Path.Combine(userDir, "profile.json");
 
@@ -774,7 +774,7 @@ namespace FileBlogSystem.Services
                 }
 
                 Directory.CreateDirectory(userDir);
-                 string hashedPassword = PasswordHasher.HashPassword(request.Password);
+                string hashedPassword = PasswordHasher.HashPassword(request.Password);
                 var newUser = new UserResponse
                 {
                     Username = username,
@@ -827,9 +827,9 @@ namespace FileBlogSystem.Services
                 if (!string.IsNullOrEmpty(request.HashedPassword))
                 {
                     existingUser.HashedPassword = request.HashedPassword.Trim();
-                } 
+                }
 
-                 if (!string.IsNullOrEmpty(request.ProfilePictureBase64) && !string.IsNullOrEmpty(request.ProfilePictureFileName))
+                if (!string.IsNullOrEmpty(request.ProfilePictureBase64) && !string.IsNullOrEmpty(request.ProfilePictureFileName))
                 {
                     var profilePictureDir = Path.Combine(userDir, "profilepicture");
                     Directory.CreateDirectory(profilePictureDir);
@@ -870,11 +870,11 @@ namespace FileBlogSystem.Services
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, $"Error saving profile picture for user: {username}");
-                        existingUser.ProfilePictureUrl = GetProfilePictureUrl(username); 
-                        existingUser.ProfilePictureUrl = GetProfilePictureUrl(username); 
+                        existingUser.ProfilePictureUrl = GetProfilePictureUrl(username);
+                        existingUser.ProfilePictureUrl = GetProfilePictureUrl(username);
                     }
                 }
-                 else if (request.ProfilePictureBase64 == null && request.ProfilePictureFileName == null && existingUser.ProfilePictureUrl != null)
+                else if (request.ProfilePictureBase64 == null && request.ProfilePictureFileName == null && existingUser.ProfilePictureUrl != null)
                 {
                     var profilePictureDir = Path.Combine(userDir, "profilepicture");
                     if (Directory.Exists(profilePictureDir))
@@ -887,7 +887,7 @@ namespace FileBlogSystem.Services
 
                 var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
                 var json = JsonSerializer.Serialize(existingUser, jsonOptions);
-                await File.WriteAllTextAsync(profileFilePath, json); 
+                await File.WriteAllTextAsync(profileFilePath, json);
 
                 _logger.LogInformation($"Successfully updated user profile for: {userToUpdateUsername}");
                 return existingUser;
@@ -898,8 +898,8 @@ namespace FileBlogSystem.Services
                 return null;
             }
         }
-        
-       public async Task<bool> DeleteUserAsync(string username)
+
+        public async Task<bool> DeleteUserAsync(string username)
         {
             try
             {
@@ -916,7 +916,7 @@ namespace FileBlogSystem.Services
                 else
                 {
                     _logger.LogWarning($"User directory for '{userToDeleteUsername}' not found at expected path: {userDir}.");
-                    return false; 
+                    return false;
                 }
             }
             catch (Exception ex)
@@ -925,7 +925,7 @@ namespace FileBlogSystem.Services
                 return false;
             }
         }
-        
+
         public async Task<bool> SaveUpdatedMetaAsync(BlogPostMetaResponse post)
         {
             try
@@ -948,40 +948,84 @@ namespace FileBlogSystem.Services
         {
             var postMeta = await GetBlogPostMetaBySlugAsync(slug);
             if (postMeta == null || string.IsNullOrEmpty(postMeta.PostFolderPath)) return false;
-        
+
             var commentsDir = Path.Combine(postMeta.PostFolderPath, "comments");
             Directory.CreateDirectory(commentsDir);
-        
+
             comment.Id = Guid.NewGuid();
             comment.CreatedAt = DateTime.UtcNow;
 
             var commentPath = Path.Combine(commentsDir, $"{comment.Id}.json");
             var json = JsonSerializer.Serialize(comment, new JsonSerializerOptions { WriteIndented = true });
-        
+
             await File.WriteAllTextAsync(commentPath, json);
             return true;
         }
-        
-       public async Task<List<CommentModel>> GetCommentsAsync(string slug)
+
+        public async Task<List<CommentModel>> GetCommentsAsync(string slug)
         {
             var postMeta = await GetBlogPostMetaBySlugAsync(slug);
             var comments = new List<CommentModel>();
-        
+
             if (postMeta == null || string.IsNullOrEmpty(postMeta.PostFolderPath)) return comments;
-        
+
             var commentsDir = Path.Combine(postMeta.PostFolderPath, "comments");
             if (!Directory.Exists(commentsDir)) return comments;
-        
+
             foreach (var file in Directory.GetFiles(commentsDir, "*.json"))
             {
                 var comment = await ReadJsonFileAsync<CommentModel>(file);
                 if (comment != null) comments.Add(comment);
             }
-        
+
             return comments.OrderByDescending(c => c.CreatedAt).ToList();
         }
-        
-        
+
+        public async Task<CategoryResponse?> GetCategoryByIdAsync(Guid id)
+        {
+            if (!Directory.Exists(_categoriesFolderPath))
+                return null;
+
+            foreach (var file in Directory.GetFiles(_categoriesFolderPath, "*.json"))
+            {
+                try
+                {
+                    var json = await File.ReadAllTextAsync(file);
+                    var category = JsonSerializer.Deserialize<CategoryResponse>(json);
+                    if (category?.Id == id)
+                        return category;
+                }
+                catch
+                {
+                    continue;
+                }
+            }
+
+            return null;
+        }
+    
+        public async Task<TagResponse?> GetTagByIdAsync(Guid id)
+        {
+            if (!Directory.Exists(_tagsFolderPath))
+                return null;
+
+            foreach (var file in Directory.GetFiles(_tagsFolderPath, "*.json"))
+            {
+                try
+                {
+                    var json = await File.ReadAllTextAsync(file);
+                    var tag = JsonSerializer.Deserialize<TagResponse>(json);
+                    if (tag?.Id == id)
+                        return tag;
+                }
+                catch
+                {
+                    continue;
+                }
+            }
+
+            return null;
+        }
         
     }
 

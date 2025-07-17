@@ -15,5 +15,8 @@
   "Content": "",
   "ImageUrl": "/content/posts/2025-06-29-painting/assets/b4d24a6f-b324-43c3-8122-be04525aaef3.jpeg",
   "AuthorUsername": "admin",
-  "ScheduledFor": null
+  "ScheduledFor": null,
+  "LikedByUsers": [
+    "admin"
+  ]
 }

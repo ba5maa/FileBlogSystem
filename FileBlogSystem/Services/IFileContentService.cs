@@ -26,6 +26,8 @@ namespace FileBlogSystem.Services
         Task<bool> SaveUpdatedMetaAsync(BlogPostMetaResponse post);
         Task<bool> AddCommentAsync(string slug, CommentModel comment);
         Task<List<CommentModel>> GetCommentsAsync(string slug);
+        Task<CategoryResponse?> GetCategoryByIdAsync(Guid id);
+        Task<TagResponse?> GetTagByIdAsync(Guid id);
 
     }
 }

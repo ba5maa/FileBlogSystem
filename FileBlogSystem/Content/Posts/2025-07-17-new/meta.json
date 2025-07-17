@@ -1,10 +1,10 @@
 {
-  "Id": "a9a3fb1c-5d5b-405c-acad-0137b18b9528",
-  "Title": "new post from admin",
+  "Id": "414a38fe-7c17-4c77-a021-009358d1f0a2",
+  "Title": "new",
   "Description": "",
   "CreationDate": "0001-01-01T00:00:00",
-  "PublishedDate": null,
-  "ModificationDate": "2025-07-14T08:39:44.500836Z",
+  "PublishedDate": "2025-07-17T00:00:00",
+  "ModificationDate": "2025-07-17T14:01:23.0468908Z",
   "Tags": [
     "2661cdfd-c8f5-4b12-9563-3e481dfc8829"
   ],
@@ -12,8 +12,8 @@
     "21f0552e-fa31-4c12-ae23-25c2306a2c9a"
   ],
   "CustomUrl": null,
-  "Slug": "new-post-from-admin",
-  "isDraft": true,
+  "Slug": "new",
+  "isDraft": false,
   "Content": "",
   "ImageUrl": null,
   "AuthorUsername": "admin",

@@ -19,6 +19,7 @@
   "AuthorUsername": "admin",
   "ScheduledFor": null,
   "LikedByUsers": [
-    "newuser"
+    "newuser",
+    "admin"
   ]
 }

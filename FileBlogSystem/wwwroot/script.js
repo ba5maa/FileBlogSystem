@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function fetchCommentsForPost(postSlug) {
     try {
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}/comments`)
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/post/${postSlug}/comments`)
       if (!response.ok) {
         throw new Error(`Failed to fetch comments: ${response.status}`)
       }
@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       for (const comment of comments) {
         try {
-          const userResponse = await fetchAuthenticated(`${API_BASE_URL}/api/users/${comment.username}`)
+          const userResponse = await fetchAuthenticated(`${API_BASE_URL}/api/user/${comment.username}`)
           if (userResponse.ok) {
             const userData = await userResponse.json()
             comment.authorProfilePictureUrl = userData.profilePictureUrl
@@ -119,7 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
         createdAt: new Date().toISOString(),
       }
 
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}/comments`, {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/post/${postSlug}/comment`, {
         method: "POST",
         body: JSON.stringify(commentData),
       })
@@ -164,8 +164,8 @@ document.addEventListener("DOMContentLoaded", () => {
   async function fetchCategoriesAndTags() {
     try {
       const [categoriesRes, tagsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/categories`),
-        fetch(`${API_BASE_URL}/api/tags`),
+        fetchAuthenticated(`${API_BASE_URL}/api/categories`),
+        fetchAuthenticated(`${API_BASE_URL}/api/tags`),
       ])
 
       if (categoriesRes.ok) {
@@ -359,7 +359,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (currentType === "login") {
         endpoint = `${API_BASE_URL}/api/auth/login`
       } else {
-        endpoint = `${API_BASE_URL}/api/users`
+        endpoint = `${API_BASE_URL}/api/user`
       }
 
       try {
@@ -402,7 +402,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (currentType === "login") {
           try {
-            const userResponse = await fetch(`${API_BASE_URL}/api/users/${data.user.username}`, {
+            const userResponse = await fetch(`${API_BASE_URL}/api/user/${data.user.username}`, {
               headers: { Authorization: `Bearer ${data.token}` },
             })
             if (userResponse.ok) {
@@ -659,7 +659,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       try {
-        const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts`, {
+        const response = await fetchAuthenticated(`${API_BASE_URL}/api/post`, {
           method: "POST",
           body: JSON.stringify(newPost),
         })
@@ -743,7 +743,7 @@ document.addEventListener("DOMContentLoaded", () => {
     for (const post of posts) {
       if (!userCache.has(post.authorUsername)) {
         try {
-          const userResponse = await fetchAuthenticated(`${API_BASE_URL}/api/users/${post.authorUsername}`)
+          const userResponse = await fetchAuthenticated(`${API_BASE_URL}/api/user/${post.authorUsername}`)
           if (userResponse.ok) {
             const userData = await userResponse.json()
             userCache.set(post.authorUsername, userData.profilePictureUrl)
@@ -975,7 +975,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const likeCount = likeBtn.parentElement.querySelector(".like-count")
 
           try {
-            const url = `${API_BASE_URL}/api/posts/${postId}/${isLiked ? "unlike" : "like"}`
+            const url = `${API_BASE_URL}/api/post/${postId}/${isLiked ? "unlike" : "like"}`
             const response = await fetchAuthenticated(url, { method: "POST" })
             if (!response.ok) throw new Error("Failed to update like")
 
@@ -1457,7 +1457,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       try {
-        const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postId}`, {
+        const response = await fetchAuthenticated(`${API_BASE_URL}/api/update-post/${postId}`, {
           method: "PUT",
           body: JSON.stringify(updatedPost),
         })
@@ -1485,7 +1485,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function publishDraft(postSlug) {
     try {
-      const getResponse = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}`)
+      const getResponse = await fetchAuthenticated(`${API_BASE_URL}/api/post/${postSlug}`)
       if (!getResponse.ok) throw new Error("Could not fetch draft for publishing.")
       const draftToPublish = await getResponse.json()
 
@@ -1496,7 +1496,7 @@ document.addEventListener("DOMContentLoaded", () => {
         draftToPublish.category && draftToPublish.category.length > 0 ? draftToPublish.category[0] : null
       draftToPublish.imageUrl = draftToPublish.ImageUrl || null
 
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}`, {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/update-post/${postSlug}`, {
         method: "PUT",
         body: JSON.stringify(draftToPublish),
       })
@@ -1518,7 +1518,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function deletePost(postSlug) {
     try {
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}`, {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-post/${postSlug}`, {
         method: "DELETE",
       })
 
@@ -1580,7 +1580,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function cancelPostSchedule(postSlug) {
     try {
-      const getResponse = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}`)
+      const getResponse = await fetchAuthenticated(`${API_BASE_URL}/api/post/${postSlug}`)
       if (!getResponse.ok) throw new Error("Could not fetch post for canceling schedule.")
       const postToUpdate = await getResponse.json()
 
@@ -1588,7 +1588,7 @@ document.addEventListener("DOMContentLoaded", () => {
       postToUpdate.publishedDate = null
       postToUpdate.scheduledFor = null
 
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts/${postSlug}`, {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/update-post/${postSlug}`, {
         method: "PUT",
         body: JSON.stringify(postToUpdate),
       })
@@ -1775,7 +1775,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (confirm(`Are you sure you want to delete your account ${username}?`)) {
       try {
-        const response = await fetchAuthenticated(`${API_BASE_URL}/api/users/${username}`, {
+        const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-user/${username}`, {
         method: "DELETE",
         })
 
@@ -1815,7 +1815,7 @@ document.addEventListener("DOMContentLoaded", () => {
           updateData.profilePictureFileName = profilePictureFile.name
         }
 
-        const response = await fetchAuthenticated(`${API_BASE_URL}/api/users/${user.username}`, {
+        const response = await fetchAuthenticated(`${API_BASE_URL}/api/update-user/${user.username}`, {
           method: "PUT",
           body: JSON.stringify(updateData),
         })
@@ -1914,7 +1914,7 @@ document.addEventListener("DOMContentLoaded", () => {
           throw new Error("Current password is incorrect")
         }
 
-        const response = await fetchAuthenticated(`${API_BASE_URL}/api/users/${user.username}`, {
+        const response = await fetchAuthenticated(`${API_BASE_URL}/api/update-user/${user.username}`, {
           method: "PUT",
           body: JSON.stringify({
             email: user.email,
@@ -2111,7 +2111,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const categoriesContainer = document.getElementById("categories-container")
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/categories`)
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/categories`)
       if (!response.ok) throw new Error("Failed to fetch categories")
 
       const categories = await response.json()
@@ -2185,7 +2185,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const tagsContainer = document.getElementById("tags-container")
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/tags`)
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/tags`)
       if (!response.ok) throw new Error("Failed to fetch tags")
 
       const tags = await response.json()
@@ -2256,7 +2256,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function toggleUserAdmin(username, makeAdmin) {
     try {
-      const getUserResponse = await fetchAuthenticated(`${API_BASE_URL}/api/users/${username}`)
+      const getUserResponse = await fetchAuthenticated(`${API_BASE_URL}/api/user/${username}`)
       if (!getUserResponse.ok) throw new Error("Failed to fetch user")
 
       const userData = await getUserResponse.json()
@@ -2268,7 +2268,7 @@ document.addEventListener("DOMContentLoaded", () => {
         newRoles = newRoles.filter((role) => role !== "Admin")
       }
 
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/users/${username}`, {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/update-user/${username}`, {
         method: "PUT",
         body: JSON.stringify({
           email: userData.email,
@@ -2292,7 +2292,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function deleteUser(username) {
     try {
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/users/${username}`, {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-user/${username}`, {
         method: "DELETE",
       })
 
@@ -2362,7 +2362,7 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         let response
         if (isEdit) {
-          response = await fetchAuthenticated(`${API_BASE_URL}/api/categories`, {
+          response = await fetchAuthenticated(`${API_BASE_URL}/api/update-category`, {
             method: "PUT",
             body: JSON.stringify({
               id: category.id,
@@ -2371,7 +2371,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }),
           })
         } else {
-          response = await fetchAuthenticated(`${API_BASE_URL}/api/categories`, {
+          response = await fetchAuthenticated(`${API_BASE_URL}/api/category`, {
             method: "POST",
             body: JSON.stringify({
               name: name,
@@ -2441,7 +2441,7 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         let response
         if (isEdit) {
-          response = await fetchAuthenticated(`${API_BASE_URL}/api/tags`, {
+          response = await fetchAuthenticated(`${API_BASE_URL}/api/update-tag`, {
             method: "PUT",
             body: JSON.stringify({
               id: tag.id,
@@ -2449,7 +2449,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }),
           })
         } else {
-          response = await fetchAuthenticated(`${API_BASE_URL}/api/tags`, {
+          response = await fetchAuthenticated(`${API_BASE_URL}/api/tag`, {
             method: "POST",
             body: JSON.stringify({
               name: name,
@@ -2471,7 +2471,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function deleteCategory(id) {
     try {
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/categories/${id}`, {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-category/${id}`, {
         method: "DELETE",
       })
 
@@ -2490,7 +2490,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function deleteTag(id) {
     try {
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/tags/${id}`, {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-tag/${id}`, {
         method: "DELETE",
       })
 
