@@ -13,5 +13,6 @@ namespace FileBlogSystem.Models
         [JsonIgnore]
         public string? Id { get; set; }
         public string? ProfilePictureUrl { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 }

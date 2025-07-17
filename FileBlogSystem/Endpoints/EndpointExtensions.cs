@@ -40,7 +40,6 @@ namespace FileBlogSystem.Endpoints
                     filteredPosts = filteredPosts.Where(p => p.AuthorUsername.ToLower() == authorUsername.ToLower());
                 }
 
-
                 if (!string.IsNullOrEmpty(searchTerm))
                 {
                     var lowerSearchTerm = searchTerm.ToLowerInvariant();
@@ -129,7 +128,6 @@ namespace FileBlogSystem.Endpoints
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status500InternalServerError);
 
-
             app.MapGet("/api/categories", async (IFileContentService contentService) =>
             {
                 var categories = await contentService.GetAllCategoriesAsync();
@@ -188,7 +186,6 @@ namespace FileBlogSystem.Endpoints
             .Produces<UserResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
-
             app.MapPost("/api/auth/login", async (LoginRequest request, IFileContentService contentService, IConfiguration config) =>
             {
                 Console.WriteLine($"Login attempt for username: {request.Username}");
@@ -224,6 +221,7 @@ namespace FileBlogSystem.Endpoints
                     new Claim(ClaimTypes.Name, user.Username)
 
                 };
+
                 if (user.Roles != null)
                 {
                     foreach (var role in user.Roles)
@@ -455,8 +453,6 @@ namespace FileBlogSystem.Endpoints
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status500InternalServerError);
 
-
-
             app.MapPost("/api/tag", async (CreateTagRequest request, IFileContentService contentService) =>
             {
                 var tag = await contentService.CreateTagAsync(request);
@@ -504,7 +500,6 @@ namespace FileBlogSystem.Endpoints
             .RequireAuthorization()
             .WithName(EndpointConstants.GetAllUsers)
             .WithOpenApi();
-
 
             app.MapPost("/api/user", async (CreateUserRequest request, IFileContentService contentService) =>
             {
@@ -617,8 +612,6 @@ namespace FileBlogSystem.Endpoints
             .Produces<CommentModel>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
             
-          
-
             return app;
         }
     }

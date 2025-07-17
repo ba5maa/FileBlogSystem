@@ -905,23 +905,36 @@ namespace FileBlogSystem.Services
             {
                 var userToDeleteUsername = username.Trim().ToLowerInvariant();
                 var userDir = Path.Combine(_usersFolderPath, userToDeleteUsername);
+                var userProfilePath = Path.Combine(userDir, "profile.json");
 
-                if (Directory.Exists(userDir))
+                if (File.Exists(userProfilePath))
                 {
-                    await Task.Run(() => Directory.Delete(userDir, recursive: true));
+                    var jsonContent = await File.ReadAllTextAsync(userProfilePath);
+                    var user = JsonSerializer.Deserialize<UserResponse>(jsonContent);
 
-                    _logger.LogInformation($"Successfully deleted user directory: {userDir}");
+                    if (user == null)
+                    {
+                        _logger.LogWarning($"User profile for '{userToDeleteUsername}' could not be deserialized.");
+                        return false;
+                    }
+
+                    user.IsActive = false;
+
+                    var updatedJsonContent = JsonSerializer.Serialize(user, new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(userProfilePath, updatedJsonContent);
+
+                    _logger.LogInformation($"Successfully soft deleted user: {userToDeleteUsername}");
                     return true;
                 }
                 else
                 {
-                    _logger.LogWarning($"User directory for '{userToDeleteUsername}' not found at expected path: {userDir}.");
+                    _logger.LogWarning($"User profile file for '{userToDeleteUsername}' not found at expected path: {userProfilePath}.");
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error deleting user '{username}'.");
+                _logger.LogError(ex, $"Error soft deleting user '{username}'.");
                 return false;
             }
         }

@@ -2020,7 +2020,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetchAuthenticated(`${API_BASE_URL}/api/users`)
       if (!response.ok) throw new Error("Failed to fetch users")
 
-      const users = await response.json()
+      const allUsers = await response.json()
+      const users = allUsers.filter(user => user.isActive === true)
       usersContainer.innerHTML = ""
       usersCount.textContent = `${users.length} users`
 

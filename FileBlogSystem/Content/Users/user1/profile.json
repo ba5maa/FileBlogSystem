@@ -4,5 +4,7 @@
   "Roles": [
     "Author"
   ],
-  "HashedPassword": "$2a$10$ETgM1GjCOT6M8.EcQLke2OYQTlfI.OS1VFJgS0hqK4c1zUjmADFTC"
+  "HashedPassword": "$2a$10$ETgM1GjCOT6M8.EcQLke2OYQTlfI.OS1VFJgS0hqK4c1zUjmADFTC",
+  "ProfilePictureUrl": null,
+  "IsActive": true
 }
