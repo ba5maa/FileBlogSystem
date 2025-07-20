@@ -106,6 +106,7 @@ namespace FileBlogSystem.Endpoints
 
                 return Results.Ok(new
                 {
+                    postMeta.Id,
                     postMeta.Title,
                     postMeta.Description,
                     postMeta.PublishedDate,
@@ -510,7 +511,6 @@ namespace FileBlogSystem.Endpoints
                 }
                 return Results.CreatedAtRoute(EndpointConstants.GetUserByUsername, new { username = user.Username }, user);
             })
-            .RequireAuthorization()
             .WithName(EndpointConstants.CreateUser)
             .WithOpenApi();
 

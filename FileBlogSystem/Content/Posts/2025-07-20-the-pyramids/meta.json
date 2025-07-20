@@ -1,0 +1,26 @@
+{
+  "Id": "6d7b2d7c-7c2f-4aa2-8bec-c9f270f0ae99",
+  "Title": "The Pyramids!",
+  "Description": "",
+  "CreationDate": "0001-01-01T00:00:00",
+  "PublishedDate": "2025-07-20T21:28:48.887Z",
+  "ModificationDate": "2025-07-20T21:31:05.3256596Z",
+  "Tags": [
+    "2b61cc78-6d66-4185-8b0f-1ba34fd0728b",
+    "b2dfccad-464a-4c92-bfc7-42603ca70e67",
+    "25014654-cd26-4e39-960a-8244a10ded2f"
+  ],
+  "Categories": [
+    "7684d9cc-a461-472a-a09b-39fc644fa5c4"
+  ],
+  "CustomUrl": null,
+  "Slug": "the-pyramids",
+  "isDraft": false,
+  "Content": "",
+  "ImageUrl": "/content/posts/2025-07-20-the-pyramids/assets/e41d06ac-d98b-4116-b8c9-5f28e232e251.jpeg",
+  "AuthorUsername": "admin",
+  "ScheduledFor": null,
+  "LikedByUsers": [
+    "basma"
+  ]
+}

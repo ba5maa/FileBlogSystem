@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const appContainer = document.getElementById("app-container")
   const mainNav = document.getElementById("main-nav")
 
@@ -9,6 +9,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let tokenExpires = null
 
   let currentPage = "feed"
+  let currentPostSlug = null
+  let currentAdminSection = "users"
 
   let CATEGORIES = []
   let TAGS = []
@@ -84,6 +86,272 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function convertMarkdownToHtml(markdownText) {
+    if (!markdownText) return ""
+
+    let html = markdownText
+      .replace(/^### (.*$)/gim, "<h3>$1</h3>")
+      .replace(/^## (.*$)/gim, "<h2>$1</h2>")
+      .replace(/^# (.*$)/gim, "<h1>$1</h1>")
+      .replace(/\*\*(.*?)\*\*/gim, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/gim, "<em>$1</em>")
+      .replace(/!\[([^\]]*)\]$$([^)]*)$$/gim, '<img src="$2" alt="$1" class="preview-image">')
+      .replace(/\[([^\]]*)\]$$([^)]*)$$/gim, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      .replace(/^> (.*$)/gim, "<blockquote>$1</blockquote>")
+      .replace(/^- (.*$)/gim, "<li>$1</li>")
+      .replace(/(<li>.*<\/li>)/s, "<ul>$1</ul>")
+      .replace(/```([^`]*)```/gim, "<pre><code>$1</code></pre>")
+      .replace(/`([^`]*)`/gim, "<code>$1</code>")
+      .replace(/\n\n/gim, "</p><p>")
+      .replace(/\n/gim, "<br>")
+
+    if (
+      !html.startsWith("<h") &&
+      !html.startsWith("<p>") &&
+      !html.startsWith("<ul>") &&
+      !html.startsWith("<blockquote>")
+    ) {
+      html = "<p>" + html + "</p>"
+    }
+
+    return html
+  }
+
+  async function renderBlogPostPage(slug) {
+    appContainer.innerHTML = `
+      <div class="blog-post-page">
+        <div class="blog-post-header">
+          <button class="back-btn" id="back-to-drafts">
+            <i class="fas fa-arrow-left"></i>
+            Back to Feed
+          </button>
+        </div>
+        <div class="blog-post-layout">
+          <div class="blog-post-main">
+            <div class="loading-posts">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>Loading blog post...</p>
+            </div>
+          </div>
+          <div class="blog-post-sidebar">
+            <div class="sidebar-sticky-container">
+              <div class="post-engagement-sidebar">
+                <div class="engagement-stats">
+                  <button class="like-btn-sidebar" id="like-btn-sidebar">
+                    <i class="fas fa-heart"></i>
+                    <span>Like</span>
+                  </button>
+                  <span class="like-count-sidebar">0 likes</span>
+                </div>
+              </div>
+              
+              <div class="comments-sidebar">
+                <div class="comments-header">
+                  <h3><i class="fas fa-comments"></i> Comments</h3>
+                </div>
+                <div class="loading-comments">
+                  <i class="fas fa-spinner fa-spin"></i>
+                  <p>Loading comments...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+
+    document.getElementById("back-to-drafts").addEventListener("click", () => {
+      currentPage = "feed"
+      currentPostSlug = null
+      renderAppContent()
+    })
+
+    try {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/post/${slug}`)
+      if (!response.ok) {
+        throw new Error("Failed to load blog post")
+      }
+
+      const post = await response.json()
+
+      try {
+        const userResponse = await fetchAuthenticated(`${API_BASE_URL}/api/user/${post.authorUsername}`)
+        if (userResponse.ok) {
+          const userData = await userResponse.json()
+          post.authorProfilePictureUrl = userData.profilePictureUrl
+        }
+      } catch (error) {
+        post.authorProfilePictureUrl = null
+      }
+
+      const blogMain = document.querySelector(".blog-post-main")
+      const isLikedByCurrentUser = post.likedByUsers?.includes(user?.username)
+      const likeCount = post.likedByUsers?.length || 0
+
+      blogMain.innerHTML = `
+        <article class="blog-post-article">
+          <header class="blog-post-article-header">
+            <h1 class="blog-post-title">${post.title}</h1>
+            
+            <div class="blog-post-meta">
+              <div class="blog-post-author">
+                <img src="${post.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="author-avatar-large" alt="Author Avatar" />
+                <div class="author-info">
+                  <span class="author-name">@${post.authorUsername}</span>
+                  <span class="publish-date">${formatDate(post.publishedDate || post.creationDate)}</span>
+                </div>
+              </div>
+              
+              <div class="blog-post-tags">
+                ${
+                  post.categories && Array.isArray(post.categories)
+                    ? post.categories
+                        .map(
+                          (cat) => `
+                  <span class="category-tag">
+                    <i class="fas fa-folder"></i>
+                    ${getCategoryNameById(cat)}
+                  </span>
+                `,
+                        )
+                        .join("")
+                    : ""
+                }
+                ${
+                  post.tags && post.tags.length > 0
+                    ? post.tags
+                        .map(
+                          (tag) => `
+                  <span class="tag">
+                    <i class="fas fa-tag"></i>
+                    ${getTagNameById(tag)}
+                  </span>
+                `,
+                        )
+                        .join("")
+                    : ""
+                }
+              </div>
+            </div>
+          </header>
+
+          <div class="blog-post-content">
+            ${convertMarkdownToHtml(post.content)}
+          </div>
+        </article>
+      `
+
+      const likeBtnSidebar = document.getElementById("like-btn-sidebar")
+      const likeCountSidebar = document.querySelector(".like-count-sidebar")
+
+      if (likeBtnSidebar && likeCountSidebar) {
+        likeBtnSidebar.classList.toggle("liked", isLikedByCurrentUser)
+        likeBtnSidebar.querySelector("span").textContent = isLikedByCurrentUser ? "Liked" : "Like"
+        likeCountSidebar.textContent = `${likeCount} like${likeCount !== 1 ? "s" : ""}`
+        likeBtnSidebar.dataset.postId = post.id
+
+        likeBtnSidebar.addEventListener("click", async (e) => {
+          e.preventDefault()
+          const postId = likeBtnSidebar.dataset.postId
+          const isLiked = likeBtnSidebar.classList.contains("liked")
+
+          try {
+            const url = `${API_BASE_URL}/api/post/${postId}/${isLiked ? "unlike" : "like"}`
+            const response = await fetchAuthenticated(url, { method: "POST" })
+            if (!response.ok) throw new Error("Failed to update like")
+
+            const result = await response.json()
+            const newCount = result.likedBy?.length || 0
+
+            likeBtnSidebar.classList.toggle("liked")
+            likeBtnSidebar.querySelector("span").textContent = isLiked ? "Like" : "Liked"
+            likeCountSidebar.textContent = `${newCount} like${newCount !== 1 ? "s" : ""}`
+          } catch (err) {
+            console.error("Like toggle error:", err)
+          }
+        })
+      }
+
+      loadCommentsInSidebar(post.slug)
+    } catch (error) {
+      console.error("Error loading blog post:", error)
+      document.querySelector(".blog-post-main").innerHTML = `
+        <div class="error-state">
+          <i class="fas fa-exclamation-triangle"></i>
+          <p>Error loading blog post: ${error.message}</p>
+        </div>
+      `
+    }
+  }
+
+  async function loadCommentsInSidebar(slug) {
+    const sidebar = document.querySelector(".comments-sidebar")
+
+    try {
+      const comments = await fetchCommentsForPost(slug)
+
+      sidebar.innerHTML = `
+        <div class="comments-header">
+          <h3><i class="fas fa-comments"></i> Comments (${comments.length})</h3>
+        </div>
+        
+        ${
+          isAuthenticated()
+            ? `
+            <div class="comment-form">
+              <textarea class="comment-input" placeholder="Write a comment..." data-post-slug="${slug}"></textarea>
+              <button class="comment-submit-btn" data-post-slug="${slug}">
+                <i class="fas fa-paper-plane"></i>
+                Post Comment
+              </button>
+            </div>
+          `
+            : '<div class="login-to-comment">Please log in to comment</div>'
+        }
+        
+        <div class="comments-list" data-post-slug="${slug}">
+        </div>
+      `
+
+      const commentsList = sidebar.querySelector(".comments-list")
+      displayComments(comments, commentsList)
+
+      const commentSubmitBtn = sidebar.querySelector(".comment-submit-btn")
+      if (commentSubmitBtn) {
+        commentSubmitBtn.addEventListener("click", async (e) => {
+          e.preventDefault()
+          const commentInput = sidebar.querySelector(".comment-input")
+
+          if (!commentInput.value.trim()) return
+
+          const originalText = commentSubmitBtn.innerHTML
+          commentSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...'
+          commentSubmitBtn.disabled = true
+
+          try {
+            const newComment = await addCommentToPost(slug, commentInput.value.trim())
+            if (newComment) {
+              commentInput.value = ""
+              loadCommentsInSidebar(slug) 
+            }
+          } catch (error) {
+            console.error("Error adding comment:", error)
+          } finally {
+            commentSubmitBtn.innerHTML = originalText
+            commentSubmitBtn.disabled = false
+          }
+        })
+      }
+    } catch (error) {
+      sidebar.innerHTML = `
+        <div class="comments-header">
+          <h3><i class="fas fa-comments"></i> Comments</h3>
+        </div>
+        <p class="error-loading-comments">Error loading comments</p>
+      `
+    }
+  }
+
   async function fetchCommentsForPost(postSlug) {
     try {
       const response = await fetchAuthenticated(`${API_BASE_URL}/api/post/${postSlug}/comments`)
@@ -140,7 +408,7 @@ document.addEventListener("DOMContentLoaded", () => {
     commentsList.innerHTML = ""
 
     if (comments.length === 0) {
-      commentsList.innerHTML = '<p class="no-comments">No comments yet. Be the first to comment!</p>'
+      commentsList.innerHTML = '<div class="no-comments">No comments yet. Be the first to comment!</div>'
       return
     }
 
@@ -150,7 +418,7 @@ document.addEventListener("DOMContentLoaded", () => {
       commentElement.innerHTML = `
         <div class="comment-header">
           <div class="comment-author">
-            <img src="${comment.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="avatar-img" alt="Avatar" style="width: 24px; height: 24px; margin-right: 8px;" />
+            <img src="${comment.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="avatar-img" alt="Avatar" />
             @${comment.username}
           </div>
           <div class="comment-date">${formatDate(comment.createdAt)}</div>
@@ -348,7 +616,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!emailInput.value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim())) {
           showFieldError("email", "Please enter a valid email address")
-          isValid = false
           return
         }
 
@@ -486,73 +753,27 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                 </div>
 
-                <div class="post-creation-section">
-                    <h3><i class="fas fa-plus-circle"></i> Create New Post</h3>
-                    <form id="create-post-form" class="create-post-form">
-                        <div class="form-row">
-                            <div class="form-group flex-2">
-                                <label for="post-title">Title</label>
-                                <input type="text" id="post-title" placeholder="Enter your post title..." required>
+                <div class="create-blog-section">
+                    <div class="create-blog-card">
+                        <div class="create-blog-content">
+                            <div class="create-blog-icon">
+                                <i class="fas fa-pen-fancy"></i>
                             </div>
-                            <div class="form-group">
-                                <label for="post-category">Category</label>
-                                <select id="post-category" required>
-                                    <option value="">Select Category</option>
-                                    ${CATEGORIES.map((cat) => `<option value="${cat.id}">${getCategoryNameById(cat.id)}</option>`).join("")}
-                                </select>
+                            <div class="create-blog-text">
+                                <h3>Share Your Story</h3>
+                                <p>Create a new blog post and share your thoughts with the world</p>
                             </div>
                         </div>
-
-                        <div class="form-group">
-                            <label for="post-content">Content</label>
-                            <textarea id="post-content" placeholder="Write your post content here..." rows="6" required></textarea>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group flex-2">
-                                <label for="post-tags">Tags</label>
-                                <select id="post-tags" multiple>
-                                    ${TAGS.map((tag) => `<option value="${tag.id}">${getTagNameById(tag.id)}</option>`).join("")}
-                                </select>
-                                <small>Hold Ctrl/Cmd to select multiple tags</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="post-image">Image</label>
-                                <input type="file" id="post-image" accept="image/*">
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="post-status">Status</label>
-                                <select id="post-status">
-                                    <option value="draft">Save as Draft</option>
-                                    <option value="publish">Publish Now</option>
-                                    <option value="schedule">Schedule</option>
-                                </select>
-                            </div>
-                            <div class="form-group" id="schedule-group" style="display: none;">
-                                <label for="schedule-date">Schedule Date</label>
-                                <input type="date" id="schedule-date" min="${getMinDate()}">
-                                <label for="schedule-time">Schedule Time</label>
-                                <input type="time" id="schedule-time">
-                            </div>
-                        </div>
-
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-paper-plane"></i>
-                                <span id="submit-btn-text">Create Post</span>
-                            </button>
-                        </div>
-
-                        <div id="create-post-message" class="message" style="display: none;"></div>
-                    </form>
+                        <button class="create-blog-btn" id="create-blog-btn">
+                            <i class="fas fa-plus"></i>
+                            Create Blog
+                        </button>
+                    </div>
                 </div>
 
                 <div class="feed-section">
                     <div class="feed-header">
-                        <h3><i class="fas fa-stream"></i> Recent Posts</h3>
+                        <h3><i class="fas fa-stream"></i> Recent Blogs</h3>
                         <div class="feed-stats">
                             <span id="posts-count">Loading...</span>
                         </div>
@@ -567,134 +788,434 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
         `
 
-    setupPostCreation()
+    document.getElementById("create-blog-btn").addEventListener("click", () => {
+      currentPage = "create-blog"
+      renderCreateBlogPage()
+    })
+
     setupSearchAndFilter()
     loadPosts()
   }
 
-  function setupPostCreation() {
-    const form = document.getElementById("create-post-form")
-    const statusSelect = document.getElementById("post-status")
-    const scheduleGroup = document.getElementById("schedule-group")
-    const submitBtnText = document.getElementById("submit-btn-text")
-    const messageElement = document.getElementById("create-post-message")
-    const postImageInput = document.getElementById("post-image")
-    const scheduleDateInput = document.getElementById("schedule-date")
-    const scheduleTimeInput = document.getElementById("schedule-time")
+  function renderCreateBlogPage() {
+    appContainer.innerHTML = `
+        <div class="create-blog-page">
+            <div class="blog-editor-header">
+                <div class="header-left">
+                    <button class="back-btn" id="back-to-drafts">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Feed
+                    </button>
+                </div>
+                <div class="header-right">
+                    <div class="editor-actions">
+                        <button class="btn btn-outline" id="save-draft-btn">
+                            <i class="fas fa-save"></i>
+                            Save Draft
+                        </button>
+                        <div class="dropdown">
+                            <button class="btn btn-primary dropdown-toggle" id="publish-dropdown">
+                                <i class="fas fa-paper-plane"></i>
+                                Publish
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <div class="dropdown-menu" id="publish-menu">
+                                <a href="#" class="dropdown-item" id="publish-now">
+                                    <i class="fas fa-paper-plane"></i> Publish Now
+                                </a>
+                                <a href="#" class="dropdown-item" id="schedule-post">
+                                    <i class="fas fa-clock"></i> Schedule Post
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-    scheduleDateInput.min = getMinDate()
+            <div class="blog-editor-container">
+                <div class="blog-meta-section">
+                    <div class="form-group">
+                        <input type="text" id="blog-title" placeholder="Enter your blog title..." class="blog-title-input">
+                    </div>
+                    
+                    <div class="meta-row">
+                        <div class="form-group">
+                            <label for="blog-category">Category</label>
+                            <select id="blog-category" required>
+                                <option value="">Select Category</option>
+                                ${CATEGORIES.map((cat) => `<option value="${cat.id}">${getCategoryNameById(cat.id)}</option>`).join("")}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="blog-tags">Tags</label>
+                            <select id="blog-tags" multiple>
+                                ${TAGS.map((tag) => `<option value="${tag.id}">${getTagNameById(tag.id)}</option>`).join("")}
+                            </select>
+                        </div>
+                    </div>
+                </div>
 
-    statusSelect.addEventListener("change", () => {
-      if (statusSelect.value === "schedule") {
-        scheduleGroup.style.display = "block"
-        submitBtnText.textContent = "Schedule Post"
-      } else {
-        scheduleGroup.style.display = "none"
-        submitBtnText.textContent = statusSelect.value === "draft" ? "Save Draft" : "Publish Post"
-      }
+                <div class="editor-main">
+                    <div class="editor-toolbar">
+                        <div class="toolbar-group">
+                            <button class="toolbar-btn" id="bold-btn" title="Bold">
+                                <i class="fas fa-bold"></i>
+                            </button>
+                            <button class="toolbar-btn" id="italic-btn" title="Italic">
+                                <i class="fas fa-italic"></i>
+                            </button>
+                            <button class="toolbar-btn" id="heading-btn" title="Heading">
+                                <i class="fas fa-heading"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="toolbar-group">
+                            <button class="toolbar-btn" id="link-btn" title="Link">
+                                <i class="fas fa-link"></i>
+                            </button>
+                            <button class="toolbar-btn" id="image-btn" title="Insert Image">
+                                <i class="fas fa-image"></i>
+                            </button>
+                            <button class="toolbar-btn" id="code-btn" title="Code">
+                                <i class="fas fa-code"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="toolbar-group">
+                            <button class="toolbar-btn" id="list-btn" title="List">
+                                <i class="fas fa-list"></i>
+                            </button>
+                            <button class="toolbar-btn" id="quote-btn" title="Quote">
+                                <i class="fas fa-quote-left"></i>
+                            </button>
+                        </div>
+                        
+                        <input type="file" id="image-upload" accept="image/*" style="display: none;">
+                    </div>
+
+                    <div class="editor-content">
+                        <div class="editor-tabs">
+                            <button class="tab-btn active" id="write-tab">Write</button>
+                            <button class="tab-btn" id="preview-tab">Preview</button>
+                        </div>
+                        
+                        <div class="editor-panes">
+                            <div class="editor-pane active" id="write-pane">
+                                <textarea id="markdown-editor" placeholder="Write your blog content in Markdown...
+
+# Example Heading
+
+This is a paragraph with **bold text** and *italic text*.
+
+## Subheading
+
+- List item 1
+- List item 2
+
+> This is a quote
+
+\`\`\`javascript
+// Code block
+console.log('Hello World');
+\`\`\`
+
+You can insert images anywhere by clicking the image button in the toolbar or using markdown syntax: ![Alt text](image-url)"></textarea>
+                            </div>
+                            
+                            <div class="editor-pane" id="preview-pane">
+                                <div class="markdown-preview" id="markdown-preview">
+                                    <p class="preview-placeholder">Start writing to see preview...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="schedule-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Schedule Post</h3>
+                        <button class="modal-close" id="close-schedule-modal">&times;</button>
+                    </div>
+                    <div class="modal-form">
+                        <div class="form-group">
+                            <label for="schedule-date">Date</label>
+                            <input type="date" id="schedule-date" min="${getMinDate()}">
+                        </div>
+                        <div class="form-group">
+                            <label for="schedule-time">Time</label>
+                            <input type="time" id="schedule-time">
+                        </div>
+                        <div class="modal-actions">
+                            <button class="btn btn-outline" id="cancel-schedule">Cancel</button>
+                            <button class="btn btn-primary" id="confirm-schedule">Schedule Post</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="blog-message" class="message" style="display: none;"></div>
+        </div>
+    `
+
+    setupBlogEditor()
+  }
+
+  function setupBlogEditor() {
+    const backBtn = document.getElementById("back-to-drafts")
+    const markdownEditor = document.getElementById("markdown-editor")
+    const markdownPreview = document.getElementById("markdown-preview")
+    const writeTab = document.getElementById("write-tab")
+    const previewTab = document.getElementById("preview-tab")
+    const writePaneEl = document.getElementById("write-pane")
+    const previewPaneEl = document.getElementById("preview-pane")
+    const publishDropdown = document.getElementById("publish-dropdown")
+    const publishMenu = document.getElementById("publish-menu")
+    const scheduleModal = document.getElementById("schedule-modal")
+    const messageElement = document.getElementById("blog-message")
+
+    backBtn.addEventListener("click", () => {
+      currentPage = "feed"
+      renderAppContent()
     })
 
-    form.addEventListener("submit", async (e) => {
+    writeTab.addEventListener("click", () => {
+      writeTab.classList.add("active")
+      previewTab.classList.remove("active")
+      writePaneEl.classList.add("active")
+      previewPaneEl.classList.remove("active")
+    })
+
+    previewTab.addEventListener("click", () => {
+      previewTab.classList.add("active")
+      writeTab.classList.remove("active")
+      previewPaneEl.classList.add("active")
+      writePaneEl.classList.remove("active")
+      updatePreview()
+    })
+
+    markdownEditor.addEventListener("input", debounce(updatePreview, 300))
+
+    function updatePreview() {
+      const markdownText = markdownEditor.value
+      if (!markdownText.trim()) {
+        markdownPreview.innerHTML = '<p class="preview-placeholder">Start writing to see preview...</p>'
+        return
+      }
+
+      markdownPreview.innerHTML = convertMarkdownToHtml(markdownText)
+    }
+
+    setupToolbar()
+
+    publishDropdown.addEventListener("click", (e) => {
+      e.stopPropagation()
+      publishMenu.classList.toggle("show")
+    })
+
+    document.addEventListener("click", () => {
+      publishMenu.classList.remove("show")
+    })
+
+    document.getElementById("publish-now").addEventListener("click", (e) => {
       e.preventDefault()
-      showMessage("", "", messageElement)
+      publishBlog("publish")
+    })
 
-      const selectedTags = Array.from(document.getElementById("post-tags").selectedOptions).map(
-        (option) => option.value,
-      )
+    document.getElementById("save-draft-btn").addEventListener("click", () => {
+      publishBlog("draft")
+    })
 
-      const selectedCategoryId = document.getElementById("post-category").value
+    document.getElementById("schedule-post").addEventListener("click", (e) => {
+      e.preventDefault()
+      scheduleModal.style.display = "flex"
+    })
 
-      const status = document.getElementById("post-status").value
-      let publishedDate = null
+    document.getElementById("close-schedule-modal").addEventListener("click", () => {
+      scheduleModal.style.display = "none"
+    })
 
-      if (status === "publish") {
-        publishedDate = new Date().toISOString()
-      } else if (status === "schedule") {
-        const dateVal = scheduleDateInput.value
-        const timeVal = scheduleTimeInput.value
+    document.getElementById("cancel-schedule").addEventListener("click", () => {
+      scheduleModal.style.display = "none"
+    })
 
-        if (!dateVal || !timeVal) {
-          showMessage("Please select both a date and time for scheduling.", "error", messageElement)
-          return
-        }
+    document.getElementById("confirm-schedule").addEventListener("click", () => {
+      const date = document.getElementById("schedule-date").value
+      const time = document.getElementById("schedule-time").value
 
-        const scheduledDateTime = new Date(`${dateVal}T${timeVal}:00`)
-        const now = new Date()
-
-        if (scheduledDateTime <= now) {
-          showMessage("Scheduled date and time must be in the future.", "error", messageElement)
-          return
-        }
-        publishedDate = scheduledDateTime.toISOString()
+      if (!date || !time) {
+        showMessage("Please select both date and time", "error", messageElement)
+        return
       }
 
-      const newPost = {
-        title: document.getElementById("post-title").value,
-        AuthorUsername: user.username,
-        content: document.getElementById("post-content").value,
-        categories: selectedCategoryId ? [selectedCategoryId] : [],
-        tags: selectedTags,
-        isDraft: status === "draft" || (status === "schedule" && new Date(publishedDate) > new Date()),
-        publishedDate: publishedDate,
-        scheduledFor:
-          status === "schedule"
-            ? new Date(`${scheduleDateInput.value}T${scheduleTimeInput.value}:00`).toISOString()
-            : null,
-        ImageUrl: null,
-        Base64Image: null,
+      const scheduledDateTime = new Date(`${date}T${time}:00`)
+      if (scheduledDateTime <= new Date()) {
+        showMessage("Scheduled time must be in the future", "error", messageElement)
+        return
       }
 
-      if (postImageInput.files.length > 0) {
-        const file = postImageInput.files[0]
-        try {
-          newPost.base64Image = await readFileAsBase64(file)
-        } catch (error) {
-          showMessage("Error reading image file: " + error.message, "error", messageElement)
-          return
-        }
-      }
+      scheduleModal.style.display = "none"
+      publishBlog("schedule", scheduledDateTime)
+    })
 
-      if (status === "publish") {
-        newPost.publishedDate = new Date().toISOString()
-      }
-
-      try {
-        const response = await fetchAuthenticated(`${API_BASE_URL}/api/post`, {
-          method: "POST",
-          body: JSON.stringify(newPost),
-        })
-
-        const data = await response.json()
-
-        if (!response.ok) {
-          const errorMessage = data.errors
-            ? Object.values(data.errors).flat().join("; ")
-            : data.detail || data.message || `API Error: ${response.statusText}`
-          throw new Error(errorMessage)
-        }
-
-        showMessage("Post created successfully!", "success", messageElement)
-        form.reset()
-        if (newPost.isDraft) {
-          currentPage = "drafts"
-        } else {
-          currentPage = "feed"
-        }
-        renderAppContent()
-      } catch (error) {
-        console.error("Create post error:", error)
-        showMessage(error.message, "error", messageElement)
+    scheduleModal.addEventListener("click", (e) => {
+      if (e.target === scheduleModal) {
+        scheduleModal.style.display = "none"
       }
     })
   }
 
-  function readFileAsBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result)
-      reader.onerror = (error) => reject(error)
-      reader.readAsDataURL(file)
+  function setupToolbar() {
+    const editor = document.getElementById("markdown-editor")
+    const imageUpload = document.getElementById("image-upload")
+
+    document.getElementById("bold-btn").addEventListener("click", () => {
+      insertMarkdown("**", "**", "bold text")
     })
+
+    document.getElementById("italic-btn").addEventListener("click", () => {
+      insertMarkdown("*", "*", "italic text")
+    })
+
+    document.getElementById("heading-btn").addEventListener("click", () => {
+      insertMarkdown("## ", "", "Heading")
+    })
+
+    document.getElementById("link-btn").addEventListener("click", () => {
+      const url = prompt("Enter URL:")
+      if (url) {
+        insertMarkdown("[", `](${url})`, "link text")
+      }
+    })
+
+    document.getElementById("image-btn").addEventListener("click", () => {
+      imageUpload.click()
+    })
+
+    imageUpload.addEventListener("change", async (e) => {
+      const file = e.target.files[0]
+      if (file) {
+        try {
+          const base64 = await readFileAsBase64(file)
+          const altText = prompt("Enter alt text for the image:") || "Image"
+          insertMarkdown("![", `](${base64})`, altText)
+        } catch (error) {
+          showMessage("Error uploading image: " + error.message, "error", document.getElementById("blog-message"))
+        }
+      }
+    })
+
+    document.getElementById("code-btn").addEventListener("click", () => {
+      insertMarkdown("`", "`", "code")
+    })
+
+    document.getElementById("list-btn").addEventListener("click", () => {
+      insertMarkdown("- ", "", "List item")
+    })
+
+    document.getElementById("quote-btn").addEventListener("click", () => {
+      insertMarkdown("> ", "", "Quote")
+    })
+
+    function insertMarkdown(before, after, placeholder) {
+      const start = editor.selectionStart
+      const end = editor.selectionEnd
+      const selectedText = editor.value.substring(start, end)
+      const replacement = before + (selectedText || placeholder) + after
+
+      editor.value = editor.value.substring(0, start) + replacement + editor.value.substring(end)
+
+      const newCursorPos = selectedText ? start + replacement.length : start + before.length + placeholder.length
+      editor.setSelectionRange(newCursorPos, newCursorPos)
+      editor.focus()
+
+      const event = new Event("input")
+      editor.dispatchEvent(event)
+    }
+  }
+
+  async function publishBlog(status, scheduledDate = null) {
+    const title = document.getElementById("blog-title").value.trim()
+    const content = document.getElementById("markdown-editor").value.trim()
+    const categoryId = document.getElementById("blog-category").value
+    const selectedTags = Array.from(document.getElementById("blog-tags").selectedOptions).map((option) => option.value)
+    const messageElement = document.getElementById("blog-message")
+
+    if (!title) {
+      showMessage("Please enter a blog title", "error", messageElement)
+      return
+    }
+
+    if (!content) {
+      showMessage("Please write some content", "error", messageElement)
+      return
+    }
+
+    if (!categoryId) {
+      showMessage("Please select a category", "error", messageElement)
+      return
+    }
+
+    let publishedDate = null
+    let isDraft = true
+
+    if (status === "publish") {
+      publishedDate = new Date().toISOString()
+      isDraft = false
+    } else if (status === "schedule") {
+      publishedDate = scheduledDate.toISOString()
+      isDraft = true
+    }
+
+    const newPost = {
+      title: title,
+      AuthorUsername: user.username,
+      content: content,
+      categories: [categoryId],
+      tags: selectedTags,
+      isDraft: isDraft,
+      publishedDate: publishedDate,
+      scheduledFor: status === "schedule" ? scheduledDate.toISOString() : null,
+      ImageUrl: null,
+      Base64Image: null,
+    }
+
+    try {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/post`, {
+        method: "POST",
+        body: JSON.stringify(newPost),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        const errorMessage = data.errors
+          ? Object.values(data.errors).flat().join("; ")
+          : data.detail || data.message || `API Error: ${response.statusText}`
+        throw new Error(errorMessage)
+      }
+
+      let successMessage = ""
+      if (status === "publish") {
+        successMessage = "Blog post published successfully!"
+      } else if (status === "draft") {
+        successMessage = "Blog post saved as draft!"
+      } else if (status === "schedule") {
+        successMessage = `Blog post scheduled for ${scheduledDate.toLocaleString()}!`
+      }
+
+      showMessage(successMessage, "success", messageElement)
+
+      setTimeout(() => {
+        currentPage = status === "draft" ? "drafts" : "feed"
+        renderAppContent()
+      }, 2000)
+    } catch (error) {
+      console.error("Publish blog error:", error)
+      showMessage(error.message, "error", messageElement)
+    }
   }
 
   function setupSearchAndFilter() {
@@ -702,8 +1223,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const tagFilter = document.getElementById("tag-filter")
 
     if (searchInput && tagFilter) {
-      searchInput.addEventListener("input", debounce(loadPosts, 300))
-      tagFilter.addEventListener("change", loadPosts)
+      searchInput.addEventListener(
+        "input",
+        debounce(() => {
+          loadPosts()
+        }, 300),
+      )
+      tagFilter.addEventListener("change", () => {
+        loadPosts()
+      })
     }
   }
 
@@ -737,6 +1265,15 @@ document.addEventListener("DOMContentLoaded", () => {
     return cat ? cat.name : id
   }
 
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = (error) => reject(error)
+      reader.readAsDataURL(file)
+    })
+  }
+
   async function fetchPostsWithProfilePictures(posts) {
     const userCache = new Map()
 
@@ -759,6 +1296,96 @@ document.addEventListener("DOMContentLoaded", () => {
     return posts
   }
 
+  function createPostCard(post) {
+    const isLikedByCurrentUser = post.likedByUsers?.includes(user?.username)
+    const likeCount = post.likedByUsers?.length || 0
+    const isAuthor = isAuthenticated() && user.username === post.authorUsername
+    const markdownPreview = convertMarkdownToHtml(post.content.substring(0, 200))
+
+    const postCard = document.createElement("div")
+    postCard.classList.add("post-card")
+    postCard.dataset.post = JSON.stringify(post)
+
+    postCard.innerHTML = `
+      ${
+        post.isDraft || post.scheduledFor
+          ? `
+        <div class="post-status-badge">
+          ${
+            post.isDraft && post.scheduledFor
+              ? '<span class="scheduled-badge"><i class="fas fa-clock"></i> Scheduled</span>'
+              : post.isDraft
+                ? '<span class="draft-badge"><i class="fas fa-edit"></i> Draft</span>'
+                : '<span class="published-badge"><i class="fas fa-check-circle"></i> Published</span>'
+          }
+        </div>
+      `
+          : ""
+      }
+      
+      <div class="post-image-container">
+        ${
+          post.imageUrl
+            ? `<img src="${API_BASE_URL}${post.imageUrl}" alt="${post.title}" class="post-image">`
+            : '<div class="post-image-placeholder"><i class="fas fa-image"></i></div>'
+        }
+      </div>
+      
+      <div class="post-card-content">
+        <div class="post-card-header">
+          <div class="post-category-tag">
+            <i class="fas fa-folder"></i>
+            ${Array.isArray(post.categories) ? post.categories.map(getCategoryNameById).join(", ") : "Uncategorized"}
+          </div>
+          <h3 class="post-card-title" data-post-slug="${post.slug}">${post.title}</h3>
+          <div class="post-card-excerpt">${markdownPreview}${post.content.length > 200 ? "..." : ""}</div>
+          ${
+            post.tags && post.tags.length > 0
+              ? `
+            <div class="post-tags">
+              ${post.tags
+                .map(
+                  (tag) => `
+                <span class="post-tag">
+                  <i class="fas fa-tag"></i>
+                  ${getTagNameById(tag)}
+                </span>
+              `,
+                )
+                .join("")}
+            </div>
+          `
+              : ""
+          }
+        </div>
+        
+        <div class="post-card-footer">
+          <div class="post-author-info">
+            <img src="${post.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" 
+                 class="post-author-avatar" alt="Author Avatar" />
+            <div class="post-author-details">
+              <span class="post-author-name">@${post.authorUsername}</span>
+              <span class="post-date">${formatDate(post.publishedDate || post.creationDate)}</span>
+            </div>
+          </div>
+          
+          <div class="post-engagement">
+            <button class="post-like-btn ${isLikedByCurrentUser ? "liked" : ""}" data-post-id="${post.id}">
+              <i class="fas fa-heart"></i>
+              <span>${likeCount}</span>
+            </button>
+            <button class="post-comment-btn" data-post-slug="${post.slug}">
+              <i class="fas fa-comment"></i>
+              <span id="comment-count-${post.slug}">0</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+
+    return postCard
+  }
+
   async function loadPosts() {
     const postsContainer = document.getElementById("posts-container")
     const postsCount = document.getElementById("posts-count")
@@ -766,11 +1393,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!postsContainer || !postsCount) return
 
     postsContainer.innerHTML = `
-            <div class="loading-posts">
-                <i class="fas fa-spinner fa-spin"></i>
-                <p>Loading posts...</p>
-            </div>
-        `
+      <div class="loading-posts">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>Loading posts...</p>
+      </div>
+    `
     postsCount.textContent = "Loading..."
 
     const searchInput = document.getElementById("search-input")
@@ -782,7 +1409,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const queryParams = new URLSearchParams()
     if (searchTerm) {
       queryParams.append("searchTerm", searchTerm)
-      //queryParams.append('AuthorUsername', searchTerm);
     }
     if (selectedTag) {
       queryParams.append("tag", selectedTag)
@@ -792,8 +1418,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const url = `${API_BASE_URL}/api/posts?${queryParams.toString()}`
 
     try {
-      const headers = isAuthenticated() ? { Authorization: `Bearer ${token}` } : {}
-      const response = await fetchAuthenticated(url, { headers })
+      const response = await fetchAuthenticated(url)
 
       if (!response.ok) {
         const errorData = response.headers.get("Content-Type")?.includes("application/json")
@@ -808,283 +1433,143 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (posts.length === 0) {
         postsContainer.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-box-open"></i>
-                        <h3>No posts found.</h3>
-                        <p>Try adjusting your search or filters.</p>
-                    </div>
-                `
+          <div class="empty-state">
+            <i class="fas fa-box-open"></i>
+            <h3>No posts found.</h3>
+            <p>Try adjusting your search or filters.</p>
+          </div>
+        `
         return
       }
 
       const enrichedPosts = await fetchPostsWithProfilePictures(posts)
 
       enrichedPosts.forEach((post) => {
-        const postCard = document.createElement("div")
-        postCard.classList.add("post-card")
-        postCard.dataset.tags = post.tags && Array.isArray(post.tags) ? post.tags.join(",") : ""
-        postCard.dataset.post = JSON.stringify(post)
-        const isLikedByCurrentUser = post.likedByUsers?.includes(user?.username)
-        const likeCount = post.likedByUsers?.length || 0
-        const slug = post.slug
-
-        const isAuthor = isAuthenticated() && user.username === post.AuthorUsername
-        console.log("DEBUG just seeing post:", post)
-        postCard.innerHTML = `
-    <div class="post-header">
-        <div class="post-author-info">
-            <div class="author-avatar">
-                 <img src="${post.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="avatar-img" alt="Avatar" />
-            </div>
-            <div class="author-details">
-                <span class="post-author">@${post.authorUsername || "Unknown"}</span>
-                <span class="post-date">${formatDate(post.publishedDate || post.creationDate)}</span>
-            </div>
-        </div>
-        <div class="post-status">
-            ${post.isDraft ? '<span class="draft-badge"><i class="fas fa-edit"></i> Draft</span>' : '<span class="published-badge"><i class="fas fa-check-circle"></i> Published</span>'}
-        </div>
-    </div>
-    
-    <div class="post-body">
-        <h3 class="post-title">${post.title}</h3>
-        <div class="post-meta">
-            <span class="post-category"><i class="fas fa-folder"></i> 
-              ${Array.isArray(post.categories) ? post.categories.map(getCategoryNameById).join(", ") : "Uncategorized"}
-            </span>
-            <div class="post-tags">
-                ${post.tags && post.tags.length > 0 ? post.tags.map((tag) => `<span class="tag"><i class="fas fa-tag"></i> ${getTagNameById(tag)}</span>`).join("") : ""}
-            </div>
-        </div>
-        <p class="post-content">${post.content.substring(0, 200)}</p>
-        ${post.imageUrl ? `<img src="${API_BASE_URL}${post.imageUrl}" alt="${post.title || "Post Image"}" class="post-image">` : ""}
-    </div>
-    
-    <div class="post-engagement">
-        <div class="post-stats">
-            <div class="like-section">
-                <button class="like-btn ${isLikedByCurrentUser ? "liked" : ""}" data-post-id="${post.id}">
-                  <i class="fas fa-heart"></i>
-                  <span>${isLikedByCurrentUser ? "Liked" : "Like"}</span>
-                </button>
-                <span class="like-count">${likeCount} like${likeCount !== 1 ? "s" : ""}</span>
-            </div>
-            <div class="comment-count">
-                <i class="fas fa-comment"></i>
-                <span class="comment-count-text">${post.commentCount || 0} comments</span>
-            </div>
-        </div>
-        
-        <div class="comments-section">
-            <div class="comments-header">
-                <h4><i class="fas fa-comments"></i> Comments</h4>
-                <button class="toggle-comments-btn" data-post-slug="${post.slug}">
-                    <span class="toggle-text">Show Comments</span>
-                    <i class="fas fa-chevron-down"></i>
-                </button>
-            </div>
-            
-            ${
-              isAuthenticated()
-                ? `
-                <div class="comment-form">
-                    <textarea class="comment-input" placeholder="Write a comment..." data-post-slug="${post.slug}"></textarea>
-                    <button class="comment-submit-btn" data-post-slug="${post.slug}">
-                        <i class="fas fa-paper-plane"></i>
-                        Post
-                    </button>
-                </div>
-            `
-                : '<p class="no-comments">Please log in to comment</p>'
-            }
-            
-            <div class="comments-list" data-post-slug="${post.slug}">
-                <p class="no-comments">No comments yet. Be the first to comment!</p>
-            </div>
-        </div>
-    </div>
-    
-    <div class="post-actions">
-        ${
-          isAuthor
-            ? `
-            <div class="dropdown">
-                <button class="btn btn-sm btn-outline dropdown-toggle">
-                    <i class="fas fa-ellipsis-h"></i> Actions
-                </button>
-                <div class="dropdown-menu">
-                    <a href="#" class="dropdown-item edit-post-btn" data-post-slug="${post.slug}"><i class="fas fa-edit"></i> Edit</a>
-                    <a href="#" class="dropdown-item delete-post-btn" data-post-slug="${post.slug}"><i class="fas fa-trash"></i> Delete</a>
-                </div>
-            </div>
-        `
-            : ""
-        }
-    </div>
-`
-
+        const postCard = createPostCard(post)
         postsContainer.appendChild(postCard)
 
+        const postTitle = postCard.querySelector(".post-card-title")
+        postTitle.addEventListener("click", (e) => {
+          const postSlug = postTitle.dataset.postSlug
+          currentPage = "blog-post"
+          currentPostSlug = postSlug
+          renderBlogPostPage(postSlug)
+        })
+
         fetchCommentsForPost(post.slug).then((comments) => {
-          const commentCountSpan = postCard.querySelector(".comment-count-text")
+          const commentCountSpan = postCard.querySelector(`#comment-count-${post.slug}`)
           if (commentCountSpan) {
-            commentCountSpan.textContent = `${comments.length} comment${comments.length !== 1 ? "s" : ""}`
+            commentCountSpan.textContent = comments.length
           }
         })
       })
 
-      postsContainer.querySelectorAll(".dropdown-toggle").forEach((button) => {
-        button.addEventListener("click", (e) => {
-          e.stopPropagation()
-          const dropdownMenu = e.currentTarget.nextElementSibling
-          dropdownMenu.classList.toggle("show")
-        })
-      })
-
-      document.removeEventListener("click", closeDropdowns)
-      document.addEventListener("click", closeDropdowns)
-
-      postsContainer.querySelectorAll(".edit-post-btn").forEach((button) => {
-        button.addEventListener("click", (e) => {
-          e.preventDefault()
-          const postSlug = e.currentTarget.dataset.postSlug
-          const postData = JSON.parse(e.currentTarget.closest(".post-card").dataset.post)
-          renderEditPostForm(postSlug, postData)
-        })
-      })
-
-      postsContainer.querySelectorAll(".delete-post-btn").forEach((button) => {
-        button.addEventListener("click", async (e) => {
-          e.preventDefault()
-          const postSlug = e.currentTarget.dataset.postSlug
-          console.log("DEBUG just seeing postSlug:", postSlug)
-          console.log("DEBUG just seeing dataset:", e.currentTarget.dataset)
-          if (confirm("Are you sure you want to delete this post? This action cannot be undone.")) {
-            await deletePost(postSlug)
-            loadPosts()
-          }
-        })
-      })
-
-      postsContainer.querySelectorAll(".like-btn").forEach((button) => {
-        button.addEventListener("click", async (e) => {
-          e.preventDefault()
-          const likeBtn = e.currentTarget
-          const postId = likeBtn.dataset.postId
-          const isLiked = likeBtn.classList.contains("liked")
-          const likeCount = likeBtn.parentElement.querySelector(".like-count")
-
-          try {
-            const url = `${API_BASE_URL}/api/post/${postId}/${isLiked ? "unlike" : "like"}`
-            const response = await fetchAuthenticated(url, { method: "POST" })
-            if (!response.ok) throw new Error("Failed to update like")
-
-            const result = await response.json()
-            const newCount = result.likedBy?.length || 0
-
-            likeBtn.classList.toggle("liked")
-            likeBtn.querySelector("span").textContent = isLiked ? "Like" : "Liked"
-            likeBtn.parentElement.querySelector(".like-count").textContent =
-              `${newCount} like${newCount !== 1 ? "s" : ""}`
-          } catch (err) {
-            console.error("Like toggle error:", err)
-          }
-        })
-      })
-
-      postsContainer.querySelectorAll(".toggle-comments-btn").forEach((button) => {
-        button.addEventListener("click", async (e) => {
-          e.preventDefault()
-          const postSlug = e.currentTarget.dataset.postSlug
-          const commentsList = document.querySelector(`.comments-list[data-post-slug="${postSlug}"]`)
-          const toggleText = e.currentTarget.querySelector(".toggle-text")
-          const toggleIcon = e.currentTarget.querySelector("i")
-          const commentCountText = e.currentTarget.closest(".post-card").querySelector(".comment-count-text")
-
-          if (commentsList.classList.contains("show")) {
-            commentsList.classList.remove("show")
-            toggleText.textContent = "Show Comments"
-            toggleIcon.className = "fas fa-chevron-down"
-          } else {
-            commentsList.classList.add("show")
-            toggleText.textContent = "Hide Comments"
-            toggleIcon.className = "fas fa-chevron-up"
-
-            commentsList.innerHTML =
-              '<p class="loading-comments"><i class="fas fa-spinner fa-spin"></i> Loading comments...</p>'
-
-            const comments = await fetchCommentsForPost(postSlug)
-            displayComments(comments, commentsList)
-
-            commentCountText.textContent = `${comments.length} comment${comments.length !== 1 ? "s" : ""}`
-          }
-        })
-      })
-
-      postsContainer.querySelectorAll(".comment-submit-btn").forEach((button) => {
-        button.addEventListener("click", async (e) => {
-          e.preventDefault()
-          const postSlug = e.currentTarget.dataset.postSlug
-          const commentInput = document.querySelector(`.comment-input[data-post-slug="${postSlug}"]`)
-          const commentsList = document.querySelector(`.comments-list[data-post-slug="${postSlug}"]`)
-          const commentCountText = document
-            .querySelector(`[data-post-slug="${postSlug}"]`)
-            .closest(".post-card")
-            .querySelector(".comment-count-text")
-
-          if (!commentInput.value.trim()) {
-            return
-          }
-
-          const originalText = button.innerHTML
-          button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...'
-          button.disabled = true
-
-          try {
-            const newComment = await addCommentToPost(postSlug, commentInput.value.trim())
-
-            if (newComment) {
-              commentInput.value = ""
-
-              const comments = await fetchCommentsForPost(postSlug)
-              displayComments(comments, commentsList)
-
-              commentCountText.textContent = `${comments.length} comment${comments.length !== 1 ? "s" : ""}`
-
-              if (!commentsList.classList.contains("show")) {
-                commentsList.classList.add("show")
-                const toggleBtn = document.querySelector(`.toggle-comments-btn[data-post-slug="${postSlug}"]`)
-                toggleBtn.querySelector(".toggle-text").textContent = "Hide Comments"
-                toggleBtn.querySelector("i").className = "fas fa-chevron-up"
-              }
-            } else {
-              showMessage("Failed to add comment. Please try again.", "error", commentsList)
-            }
-          } catch (error) {
-            console.error("Error adding comment:", error)
-            showMessage("Error adding comment. Please try again.", "error", commentsList)
-          } finally {
-            button.innerHTML = originalText
-            button.disabled = false
-          }
-        })
-      })
+      setupPostCardEventListeners(postsContainer)
     } catch (error) {
       postsContainer.innerHTML = `
-                <div class="error-state">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Error loading posts: ${error.message}</p>
-                </div>
-            `
+        <div class="error-state">
+          <i class="fas fa-exclamation-triangle"></i>
+          <p>Error loading posts: ${error.message}</p>
+        </div>
+      `
       postsCount.textContent = "Error"
       console.error("Error in loadPosts:", error)
     }
   }
 
-  function closeDropdowns(event) {
-    document.querySelectorAll(".dropdown-menu.show").forEach((menu) => {
-      if (!menu.contains(event.target) && !menu.previousElementSibling.contains(event.target)) {
-        menu.classList.remove("show")
+  function setupPostCardEventListeners(container) {
+    container.querySelectorAll(".dropdown-toggle").forEach((button) => {
+      button.addEventListener("click", (e) => {
+        e.stopPropagation()
+        const dropdownMenu = e.currentTarget.nextElementSibling
+        dropdownMenu.classList.toggle("show")
+      })
+    })
+
+    document.addEventListener("click", (event) => {
+      container.querySelectorAll(".dropdown-menu.show").forEach((menu) => {
+        if (!menu.contains(event.target) && !menu.previousElementSibling.contains(event.target)) {
+          menu.classList.remove("show")
+        }
+      })
+    })
+
+    container.querySelectorAll(".edit-post-btn").forEach((button) => {
+      button.addEventListener("click", (e) => {
+        e.preventDefault()
+        const postSlug = e.currentTarget.dataset.postSlug
+        const postData = JSON.parse(e.currentTarget.closest(".post-card").dataset.post)
+        renderEditPostForm(postSlug, postData)
+      })
+    })
+
+    container.querySelectorAll(".delete-post-btn").forEach((button) => {
+      button.addEventListener("click", async (e) => {
+        e.preventDefault()
+        const postSlug = e.currentTarget.dataset.postSlug
+        if (confirm("Are you sure you want to delete this post? This action cannot be undone.")) {
+          await deletePost(postSlug)
+          loadPosts()
+        }
+      })
+    })
+
+    container.querySelectorAll(".post-like-btn").forEach((button) => {
+      button.addEventListener("click", async (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const likeBtn = e.currentTarget
+        const postId = likeBtn.dataset.postId
+        const isLiked = likeBtn.classList.contains("liked")
+
+        try {
+          const url = `${API_BASE_URL}/api/post/${postId}/${isLiked ? "unlike" : "like"}`
+          const response = await fetchAuthenticated(url, { method: "POST" })
+          if (!response.ok) throw new Error("Failed to update like")
+
+          const result = await response.json()
+          const newCount = result.likedBy?.length || 0
+
+          likeBtn.classList.toggle("liked")
+          likeBtn.querySelector("span").textContent = newCount
+        } catch (err) {
+          console.error("Like toggle error:", err)
+        }
+      })
+    })
+
+    container.querySelectorAll(".post-comment-btn").forEach((button) => {
+      button.addEventListener("click", (e) => {
+        e.preventDefault()
+        const postSlug = button.dataset.postSlug
+        currentPage = "blog-post"
+        currentPostSlug = postSlug
+        renderBlogPostPage(postSlug)
+      })
+    })
+
+    container.querySelectorAll(".post-card").forEach((card) => {
+      const contentArea = card.querySelector(".post-card-excerpt")
+      if (contentArea) {
+        contentArea.style.cursor = "pointer"
+        contentArea.addEventListener("click", (e) => {
+          e.preventDefault()
+          const post = JSON.parse(card.dataset.post)
+          currentPage = "blog-post"
+          currentPostSlug = post.slug
+          renderBlogPostPage(post.slug)
+        })
+      }
+      const imageArea = card.querySelector(".post-image, .post-image-placeholder")
+      if (imageArea) {
+        imageArea.style.cursor = "pointer"
+        imageArea.addEventListener("click", (e) => {
+          e.preventDefault()
+          const post = JSON.parse(card.dataset.post)
+          currentPage = "blog-post"
+          currentPostSlug = post.slug
+          renderBlogPostPage(post.slug)
+        })
       }
     })
   }
@@ -1097,20 +1582,20 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     appContainer.innerHTML = `
-            <div class="drafts-page">
-                <div class="page-header">
-                    <h2><i class="fas fa-edit"></i> My Drafts & Posts</h2>
-                    <p>Manage your posts and drafts</p>
-                </div>
-                
-                <div id="drafts-container" class="drafts-container">
-                    <div class="loading-posts">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <p>Loading drafts...</p>
-                    </div>
-                </div>
-            </div>
-        `
+      <div class="drafts-page">
+        <div class="page-header">
+          <h2><i class="fas fa-edit"></i> My Drafts & Posts</h2>
+          <p>Manage your posts and drafts</p>
+        </div>
+        
+        <div id="drafts-container" class="drafts-container">
+          <div class="loading-posts">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading drafts...</p>
+          </div>
+        </div>
+      </div>
+    `
 
     loadDrafts()
   }
@@ -1119,16 +1604,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const draftsContainer = document.getElementById("drafts-container")
 
     draftsContainer.innerHTML = `
-            <div class="loading-posts">
-                <i class="fas fa-spinner fa-spin"></i>
-                <p>Loading drafts...</p>
-            </div>
-        `
+      <div class="loading-posts">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>Loading drafts...</p>
+      </div>
+    `
 
     try {
-      //const url = `${API_BASE_URL}/api/posts?isDraft=true&AuthorUsername=${user.username}`;
-      const responsedraft = await fetchAuthenticated(`/api/posts?authorUsername=${user.username}&isDraft=true`)
-      const response = await fetchAuthenticated(`/api/posts?authorUsername=${user.username}`)
+      const responsedraft = await fetchAuthenticated(
+        `${API_BASE_URL}/api/posts?authorUsername=${user.username}&isDraft=true`,
+      )
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts?authorUsername=${user.username}`)
 
       if (!response.ok) {
         const errorData = response.headers.get("Content-Type")?.includes("application/json")
@@ -1143,120 +1629,107 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (drafts.length === 0 && posts.length === 0) {
         draftsContainer.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-file-alt"></i>
-                        <h3>No drafts yet</h3>
-                        <p>Your draft posts will appear here</p>
-                        <button class="btn btn-primary" onclick="currentPage = 'feed'; renderAppContent();">
-                            <i class="fas fa-plus"></i> Create New Post
-                        </button>
-                    </div>
-                `
+          <div class="empty-state">
+            <i class="fas fa-file-alt"></i>
+            <h3>No drafts yet</h3>
+            <p>Your draft posts will appear here</p>
+            <button class="btn btn-primary" onclick="currentPage = 'create-blog'; renderCreateBlogPage();">
+              <i class="fas fa-plus"></i> Create New Blog
+            </button>
+          </div>
+        `
         return
       }
-      ;[...drafts, ...posts].forEach((draft) => {
-        const draftCard = document.createElement("div")
-        draftCard.className = "draft-card"
-        draftCard.dataset.post = JSON.stringify(draft)
 
-        draftCard.innerHTML = `
-                    <div class="draft-header">
-                        <div class="author-details">
-                            <span class="post-author">@${draft.authorUsername || "Unknown"}</span>
-                            <span class="draft-date">Last modified: ${formatDate(draft.modificationDate || draft.createdAt)}</span>
-                        </div>
-                        <div class="post-status">
-                         ${
-                           draft.isDraft && draft.scheduledFor
-                             ? '<span class="scheduled-badge"><i class="fas fa-clock"></i> Scheduled</span>'
-                             : draft.isDraft
-                               ? '<span class="draft-badge"><i class="fas fa-edit"></i> Draft</span>'
-                               : '<span class="published-badge"><i class="fas fa-check-circle"></i> Published</span>'
-                         }
-                       </div>
-                    </div>
-                    <div class="draft-content">
-                        <h3>${draft.title}</h3>
-                        <p>${draft.content.substring(0, 150)}${draft.content.length > 150 ? "..." : ""}</p>
-                        <div class="draft-meta">
-                            <span class="draft-category">${Array.isArray(draft.categories) ? draft.categories.map(getCategoryNameById).join(", ") : "Uncategorized"}</span>
-                            <div class="draft-tags">
-                                ${draft.tags && draft.tags.length > 0 ? draft.tags.map((tag) => `<span class="tag">${getTagNameById(tag)}</span>`).join("") : ""}
-                            </div>
-                        </div>
-                        ${draft.imageUrl ? `<img src="${API_BASE_URL}${draft.imageUrl}" alt="${draft.title}" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px;">` : ""}
+      const allPosts = [...drafts, ...posts]
+      const enrichedPosts = await fetchPostsWithProfilePictures(allPosts)
 
-                    </div>
-                    <div class="draft-actions">
-                        <button class="btn btn-primary edit-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-edit"></i>Edit</button>
-                        ${
-                          draft.isDraft
-                            ? draft.scheduledFor
-                              ? `<button class="btn btn-secondary cancel-schedule-btn" data-post-slug="${draft.slug}"><i class="fas fa-ban"></i>Cancel Schedule</button>`
-                              : `<button class="btn btn-success publish-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-paper-plane"></i>Publish Now</button>`
-                            : ""
-                        }    
-                        <button class="btn btn-danger delete-draft-btn" data-post-slug="${draft.slug}"><i class="fas fa-trash"></i>Delete</button>
-                    </div>
-                `
-        draftsContainer.appendChild(draftCard)
+      enrichedPosts.forEach((post) => {
+        const postCard = createPostCard(post)
+
+        const cardContent = postCard.querySelector(".post-card-content")
+        const actionsHtml = `
+          <div class="post-card-actions" style="margin-top: 1rem; padding-top: 1rem; display: flex; gap: 0.5rem; border-top: 1px solid #f0f0f0;">
+            <button class="btn btn-primary btn-sm edit-draft-btn" data-post-slug="${post.slug}">
+              <i class="fas fa-edit"></i> Edit
+            </button>
+            ${
+              post.isDraft
+                ? post.scheduledFor
+                  ? `<button class="btn btn-outline btn-sm cancel-schedule-btn" data-post-slug="${post.slug}">
+                   <i class="fas fa-ban"></i> Cancel Schedule
+                 </button>`
+                  : `<button class="btn btn-success btn-sm publish-draft-btn" data-post-slug="${post.slug}">
+                   <i class="fas fa-paper-plane"></i> Publish Now
+                 </button>`
+                : ""
+            }
+            <button class="btn btn-danger btn-sm delete-draft-btn" data-post-slug="${post.slug}">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </div>
+        `
+        cardContent.insertAdjacentHTML("beforeend", actionsHtml)
+
+        draftsContainer.appendChild(postCard)
       })
 
-      draftsContainer.querySelectorAll(".edit-draft-btn").forEach((button) => {
-        button.addEventListener("click", (e) => {
-          const postSlug = e.currentTarget.dataset.postSlug
-          const postData = JSON.parse(e.currentTarget.closest(".draft-card").dataset.post)
-          renderEditPostForm(postSlug, postData)
-        })
-      })
-
-      draftsContainer.querySelectorAll(".publish-draft-btn").forEach((button) => {
-        button.addEventListener("click", async (e) => {
-          const postSlug = e.currentTarget.dataset.postSlug
-          if (confirm("Are you sure you want to publish this draft?")) {
-            await publishDraft(postSlug)
-            loadDrafts()
-            loadPosts()
-          }
-        })
-      })
-
-      draftsContainer.querySelectorAll(".delete-draft-btn").forEach((button) => {
-        button.addEventListener("click", async (e) => {
-          const postSlug = e.currentTarget.dataset.postSlug
-          if (confirm("Are you sure you want to delete this draft? This action cannot be undone.")) {
-            console.log("DEBUG just seeing postSlug:", postSlug)
-            console.log("DEBUG just seeing dataset:", e.currentTarget.dataset)
-            await deletePost(postSlug)
-            loadDrafts()
-          }
-        })
-      })
-
-      draftsContainer.querySelectorAll(".cancel-schedule-btn").forEach((button) => {
-        button.addEventListener("click", async (e) => {
-          const postSlug = e.currentTarget.dataset.postSlug
-          if (confirm("Are you sure you want to cancel the schedule and revert this post to a regular draft?")) {
-            await cancelPostSchedule(postSlug)
-            loadDrafts()
-          }
-        })
-      })
+      setupDraftEventListeners(draftsContainer)
     } catch (error) {
       draftsContainer.innerHTML = `
-                <div class="error-state">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Error loading drafts: ${error.message}</p>
-                </div>
-            `
+        <div class="error-state">
+          <i class="fas fa-exclamation-triangle"></i>
+          <p>Error loading drafts: ${error.message}</p>
+        </div>
+      `
       console.error("Error in loadDrafts:", error)
     }
+  }
+
+  function setupDraftEventListeners(container) {
+    container.querySelectorAll(".edit-draft-btn").forEach((button) => {
+      button.addEventListener("click", (e) => {
+        const postSlug = e.currentTarget.dataset.postSlug
+        const postData = JSON.parse(e.currentTarget.closest(".post-card").dataset.post)
+        renderEditPostForm(postSlug, postData)
+      })
+    })
+
+    container.querySelectorAll(".publish-draft-btn").forEach((button) => {
+      button.addEventListener("click", async (e) => {
+        const postSlug = e.currentTarget.dataset.postSlug
+        if (confirm("Are you sure you want to publish this draft?")) {
+          await publishDraft(postSlug)
+          loadDrafts()
+        }
+      })
+    })
+
+    container.querySelectorAll(".delete-draft-btn").forEach((button) => {
+      button.addEventListener("click", async (e) => {
+        const postSlug = e.currentTarget.dataset.postSlug
+        if (confirm("Are you sure you want to delete this draft? This action cannot be undone.")) {
+          await deletePost(postSlug)
+          loadDrafts()
+        }
+      })
+    })
+
+    container.querySelectorAll(".cancel-schedule-btn").forEach((button) => {
+      button.addEventListener("click", async (e) => {
+        const postSlug = e.currentTarget.dataset.postSlug
+        if (confirm("Are you sure you want to cancel the schedule and revert this post to a regular draft?")) {
+          await cancelPostSchedule(postSlug)
+          loadDrafts()
+        }
+      })
+    })
   }
 
   async function renderEditPostForm(postId, postData) {
     let publishedDateValue = ""
     let publishedTimeValue = ""
-    postData.publishedDate = getMinDate()
+    postData.publishedDate = postData.publishedDate || getMinDate()
     postData.ImageUrl = postData.ImageUrl || null
     postData.Base64Image = postData.Base64Image || null
     postData.isDraft = postData.isDraft || false
@@ -1270,94 +1743,221 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     appContainer.innerHTML = `
-            <div class="post-creation-section">
-                <h3><i class="fas fa-edit"></i> Edit Blog Post</h3>
-                <form id="edit-post-form" class="create-post-form">
-                    <input type="hidden" id="edit-post-id" value="${postId}">
-                    <div class="form-row">
-                        <div class="form-group flex-2">
-                            <label for="edit-post-title">Title</label>
-                            <input type="text" id="edit-post-title" value="${postData.title}" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="edit-post-category">Category</label>
-                            <select id="edit-post-category" required>
-                                <option value="">Select Category</option>
-                                    ${CATEGORIES.map((cat) => `<option value="${cat.id}" ${postData.categories?.includes(cat.id) ? "selected" : ""}>${getCategoryNameById(cat.id)}</option>`).join("")}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="edit-post-content">Content</label>
-                        <textarea id="edit-post-content" rows="10" required>${postData.content}</textarea>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group flex-2">
-                            <label for="edit-post-tags">Tags</label>
-                            <select id="edit-post-tags" multiple>
-                                ${TAGS.map((tag) => `<option value="${tag.id}" ${postData.tags && postData.tags.includes(tag.id) ? "selected" : ""}>${getTagNameById(tag.id)}</option>`).join("")}
-                            </select>
-                            <small>Hold Ctrl/Cmd to select multiple tags</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="edit-post-image">Image</label>
-                            <input type="file" id="edit-post-image" accept="image/*">
-                             ${
-                               postData.imageUrl
-                                 ? `<img src="${API_BASE_URL}${postData.imageUrl}" alt="${postData.title || "Current Image"}" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px;">
-                                <button type="button" class="btn btn-sm btn-danger remove-image-btn" style="margin-top: 5px;">Remove Image</button>
-                                `
-                                 : ""
-                             }                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="edit-post-status">Status</label>
-                            <select id="edit-post-status">
-                                <option value="draft" ${postData.isDraft ? "selected" : ""}>Save as Draft</option>
-                                <option value="publish" ${!postData.isDraft ? "selected" : ""}>Publish Now</option>
-                                <option value="schedule" ${postData.isDraft && postData.publishedDate ? "selected" : ""}>Schedule</option>
-                            </select>
-                        </div>
-                        <div class="form-group" id="edit-schedule-group" style="display: ${postData.isDraft && postData.publishedDate ? "block" : "none"};">
-                            <label for="edit-schedule-date">Schedule Date</label>
-                            <input type="date" id="edit-schedule-date" value="${publishedDateValue}" min="${getMinDate()}">
-                            <label for="edit-schedule-time">Schedule Time</label>
-                            <input type="time" id="edit-schedule-time" value="${publishedTimeValue}">
-                        </div>
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i>
-                            <span>Update Post</span>
-                        </button>
-                        <button type="button" class="btn btn-outline" id="cancel-edit-post">
-                            <i class="fas fa-times"></i>
-                            <span>Cancel</span>
-                        </button>
-                    </div>
-
-                    <div id="edit-post-message" class="message" style="display: none;"></div>
-                </form>
+      <div class="create-blog-page">
+        <div class="blog-editor-header">
+          <div class="header-left">
+            <button class="back-btn" id="back-to-drafts">
+              <i class="fas fa-arrow-left"></i>
+              Back to Drafts
+            </button>
+          </div>
+          <div class="header-right">
+            <div class="editor-actions">
+              <button class="btn btn-outline" id="save-draft-btn">
+                <i class="fas fa-save"></i>
+                Save Draft
+              </button>
+              <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle" id="publish-dropdown">
+                  <i class="fas fa-paper-plane"></i>
+                  Publish
+                  <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="dropdown-menu" id="publish-menu">
+                  <a href="#" class="dropdown-item" id="publish-now">
+                    <i class="fas fa-paper-plane"></i> Publish Now
+                  </a>
+                  <a href="#" class="dropdown-item" id="schedule-post">
+                    <i class="fas fa-clock"></i> Schedule Post
+                  </a>
+                </div>
+              </div>
             </div>
-        `
+          </div>
+        </div>
 
-    const form = document.getElementById("edit-post-form")
+        <div class="blog-editor-container">
+          <input type="hidden" id="edit-post-id" value="${postId}">
+          
+          <div class="blog-meta-section">
+            <div class="form-group">
+              <input type="text" id="blog-title" placeholder="Enter your blog title..." class="blog-title-input" value="${postData.title}">
+            </div>
+            
+            <div class="meta-row">
+              <div class="form-group">
+                <label for="blog-category">Category</label>
+                <select id="blog-category" required>
+                  <option value="">Select Category</option>
+                  ${CATEGORIES.map((cat) => `<option value="${cat.id}" ${postData.categories?.includes(cat.id) ? "selected" : ""}>${getCategoryNameById(cat.id)}</option>`).join("")}
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label for="blog-tags">Tags</label>
+                <select id="blog-tags" multiple>
+                  ${TAGS.map((tag) => `<option value="${tag.id}" ${postData.tags && postData.tags.includes(tag.id) ? "selected" : ""}>${getTagNameById(tag.id)}</option>`).join("")}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="editor-main">
+            <div class="editor-toolbar">
+              <div class="toolbar-group">
+                <button class="toolbar-btn" id="bold-btn" title="Bold">
+                  <i class="fas fa-bold"></i>
+                </button>
+                <button class="toolbar-btn" id="italic-btn" title="Italic">
+                  <i class="fas fa-italic"></i>
+                </button>
+                <button class="toolbar-btn" id="heading-btn" title="Heading">
+                  <i class="fas fa-heading"></i>
+                </button>
+              </div>
+              
+              <div class="toolbar-group">
+                <button class="toolbar-btn" id="link-btn" title="Link">
+                  <i class="fas fa-link"></i>
+                </button>
+                <button class="toolbar-btn" id="image-btn" title="Insert Image">
+                  <i class="fas fa-image"></i>
+                </button>
+                <button class="toolbar-btn" id="code-btn" title="Code">
+                  <i class="fas fa-code"></i>
+                </button>
+              </div>
+              
+              <div class="toolbar-group">
+                <button class="toolbar-btn" id="list-btn" title="List">
+                  <i class="fas fa-list"></i>
+                </button>
+                <button class="toolbar-btn" id="quote-btn" title="Quote">
+                  <i class="fas fa-quote-left"></i>
+                </button>
+              </div>
+              
+              <input type="file" id="image-upload" accept="image/*" style="display: none;">
+            </div>
+
+            <!-- Editor panes moved directly under toolbar -->
+            <div class="editor-content">
+              <div class="editor-tabs">
+                <button class="tab-btn active" id="write-tab">Write</button>
+                <button class="tab-btn" id="preview-tab">Preview</button>
+              </div>
+              
+              <div class="editor-panes">
+                <div class="editor-pane active" id="write-pane">
+                  <textarea id="markdown-editor" placeholder="Write your blog content in Markdown...">${postData.content}</textarea>
+                </div>
+                
+                <div class="editor-pane" id="preview-pane">
+                  <div class="markdown-preview" id="markdown-preview">
+                    <p class="preview-placeholder">Start writing to see preview...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
+            
+            <div class="form-group">
+              <label for="edit-post-image">Image</label>
+              <input type="file" id="edit-post-image" accept="image/*">
+              ${
+                postData.imageUrl
+                  ? `<img src="${API_BASE_URL}${postData.imageUrl}" alt="${postData.title || "Current Image"}" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px;">
+                   <button type="button" class="btn btn-sm btn-danger remove-image-btn" style="margin-top: 5px;">Remove Image</button>`
+                  : ""
+              }
+            </div>
+          </div>
+        </div>
+
+        <div id="schedule-modal" class="modal-overlay" style="display: none;">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3>Schedule Post</h3>
+              <button class="modal-close" id="close-schedule-modal">&times;</button>
+            </div>
+            <div class="modal-form">
+              <div class="form-group">
+                <label for="schedule-date">Date</label>
+                <input type="date" id="schedule-date" min="${getMinDate()}">
+              </div>
+              <div class="form-group">
+                <label for="schedule-time">Time</label>
+                <input type="time" id="schedule-time">
+              </div>
+              <div class="modal-actions">
+                <button class="btn btn-outline" id="cancel-schedule">Cancel</button>
+                <button class="btn btn-primary" id="confirm-schedule">Schedule Post</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="edit-post-message" class="message" style="display: none;"></div>
+      </div>
+    `
+
+    setupEditBlogEditor(postId, postData)
+  }
+
+  function setupEditBlogEditor(postId, postData) {
+    const backBtn = document.getElementById("back-to-drafts")
+    const markdownEditor = document.getElementById("markdown-editor")
+    const markdownPreview = document.getElementById("markdown-preview")
+    const writeTab = document.getElementById("write-tab")
+    const previewTab = document.getElementById("preview-tab")
+    const writePaneEl = document.getElementById("write-pane")
+    const previewPaneEl = document.getElementById("preview-pane")
+    const publishDropdown = document.getElementById("publish-dropdown")
+    const publishMenu = document.getElementById("publish-menu")
+    const scheduleModal = document.getElementById("schedule-modal")
     const messageElement = document.getElementById("edit-post-message")
-    const cancelEditButton = document.getElementById("cancel-edit-post")
     const editPostImageInput = document.getElementById("edit-post-image")
     const removeImageBtn = document.querySelector(".remove-image-btn")
-    let imageRemoved = false
-    const editStatusSelect = document.getElementById("edit-post-status")
-    const editScheduleGroup = document.getElementById("edit-schedule-group")
-    const editScheduleDateInput = document.getElementById("edit-schedule-date")
-    const editScheduleTimeInput = document.getElementById("edit-schedule-time")
 
-    editScheduleDateInput.min = getMinDate()
+    let imageRemoved = false
+
+    backBtn.addEventListener("click", () => {
+      currentPage = "drafts"
+      renderAppContent()
+    })
+
+    writeTab.addEventListener("click", () => {
+      writeTab.classList.add("active")
+      previewTab.classList.remove("active")
+      writePaneEl.classList.add("active")
+      previewPaneEl.classList.remove("active")
+    })
+
+    previewTab.addEventListener("click", () => {
+      previewTab.classList.add("active")
+      writeTab.classList.remove("active")
+      previewPaneEl.classList.add("active")
+      writePaneEl.classList.remove("active")
+      updatePreview()
+    })
+
+    markdownEditor.addEventListener("input", debounce(updatePreview, 300))
+
+    function updatePreview() {
+      const markdownText = markdownEditor.value
+      if (!markdownText.trim()) {
+        markdownPreview.innerHTML = '<p class="preview-placeholder">Start writing to see preview...</p>'
+        return
+      }
+
+      markdownPreview.innerHTML = convertMarkdownToHtml(markdownText)
+    }
+
+    updatePreview()
+
+    setupEditToolbar()
 
     if (removeImageBtn) {
       removeImageBtn.addEventListener("click", () => {
@@ -1371,61 +1971,89 @@ document.addEventListener("DOMContentLoaded", () => {
       })
     }
 
-    editStatusSelect.addEventListener("change", () => {
-      if (editStatusSelect.value === "schedule") {
-        editScheduleGroup.style.display = "block"
-      } else {
-        editScheduleGroup.style.display = "none"
+    publishDropdown.addEventListener("click", (e) => {
+      e.stopPropagation()
+      publishMenu.classList.toggle("show")
+    })
+
+    document.addEventListener("click", () => {
+      publishMenu.classList.remove("show")
+    })
+
+    document.getElementById("publish-now").addEventListener("click", (e) => {
+      e.preventDefault()
+      updatePost("publish")
+    })
+
+    document.getElementById("save-draft-btn").addEventListener("click", () => {
+      updatePost("draft")
+    })
+
+    document.getElementById("schedule-post").addEventListener("click", (e) => {
+      e.preventDefault()
+      scheduleModal.style.display = "flex"
+    })
+
+    document.getElementById("close-schedule-modal").addEventListener("click", () => {
+      scheduleModal.style.display = "none"
+    })
+
+    document.getElementById("cancel-schedule").addEventListener("click", () => {
+      scheduleModal.style.display = "none"
+    })
+
+    document.getElementById("confirm-schedule").addEventListener("click", () => {
+      const date = document.getElementById("schedule-date").value
+      const time = document.getElementById("schedule-time").value
+
+      if (!date || !time) {
+        showMessage("Please select both date and time", "error", messageElement)
+        return
+      }
+
+      const scheduledDateTime = new Date(`${date}T${time}:00`)
+      if (scheduledDateTime <= new Date()) {
+        showMessage("Scheduled time must be in the future", "error", messageElement)
+        return
+      }
+
+      scheduleModal.style.display = "none"
+      updatePost("schedule", scheduledDateTime)
+    })
+
+    scheduleModal.addEventListener("click", (e) => {
+      if (e.target === scheduleModal) {
+        scheduleModal.style.display = "none"
       }
     })
 
-    cancelEditButton.addEventListener("click", () => {
-      currentPage = postData.isDraft ? "drafts" : "feed"
-      renderAppContent()
-    })
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault()
+    async function updatePost(status, scheduledDate = null) {
       showMessage("", "", messageElement)
 
-      const selectedTags = Array.from(document.getElementById("edit-post-tags").selectedOptions).map(
+      const selectedTags = Array.from(document.getElementById("blog-tags").selectedOptions).map(
         (option) => option.value,
       )
 
-      const newStatus = document.getElementById("edit-post-status").value
-      console.log("DEBUG just seeing newStatus:", newStatus)
+      const newStatus = status
       const wasDraft = postData.isDraft
       let publishedDate = null
 
       if (newStatus === "publish") {
         publishedDate = new Date().toISOString()
       } else if (newStatus === "schedule") {
-        const dateVal = editScheduleDateInput.value
-        const timeVal = editScheduleTimeInput.value
-
-        if (!dateVal || !timeVal) {
-          showMessage("Please select both a date and time for scheduling.", "error", messageElement)
-          return
+        if (scheduledDate) {
+          publishedDate = scheduledDate.toISOString()
         }
-
-        const scheduledDateTime = new Date(`${dateVal}T${timeVal}:00`)
-        const now = new Date()
-
-        if (scheduledDateTime <= now) {
-          showMessage("Scheduled date and time must be in the future.", "error", messageElement)
-          return
-        }
-        publishedDate = scheduledDateTime.toISOString()
       } else if (!wasDraft && newStatus === "publish") {
         publishedDate = postData.publishedDate
       }
 
       const updatedPost = {
         id: postData.id,
-        title: document.getElementById("edit-post-title").value,
+        title: document.getElementById("blog-title").value,
         AuthorUsername: user.username,
-        content: document.getElementById("edit-post-content").value,
-        categories: [document.getElementById("edit-post-category").value],
+        content: document.getElementById("markdown-editor").value,
+        categories: [document.getElementById("blog-category").value],
         tags: selectedTags,
         isDraft: newStatus === "draft" || newStatus === "schedule",
         publishedDate: publishedDate,
@@ -1480,7 +2108,76 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("Update post error:", error)
         showMessage(error.message, "error", messageElement)
       }
-    })
+    }
+
+    function setupEditToolbar() {
+      const editor = document.getElementById("markdown-editor")
+      const imageUpload = document.getElementById("image-upload")
+
+      document.getElementById("bold-btn").addEventListener("click", () => {
+        insertMarkdown("**", "**", "bold text")
+      })
+
+      document.getElementById("italic-btn").addEventListener("click", () => {
+        insertMarkdown("*", "*", "italic text")
+      })
+
+      document.getElementById("heading-btn").addEventListener("click", () => {
+        insertMarkdown("## ", "", "Heading")
+      })
+
+      document.getElementById("link-btn").addEventListener("click", () => {
+        const url = prompt("Enter URL:")
+        if (url) {
+          insertMarkdown("[", `](${url})`, "link text")
+        }
+      })
+
+      document.getElementById("image-btn").addEventListener("click", () => {
+        imageUpload.click()
+      })
+
+      imageUpload.addEventListener("change", async (e) => {
+        const file = e.target.files[0]
+        if (file) {
+          try {
+            const base64 = await readFileAsBase64(file)
+            const altText = prompt("Enter alt text for the image:") || "Image"
+            insertMarkdown("![", `](${base64})`, altText)
+          } catch (error) {
+            showMessage("Error uploading image: " + error.message, "error", messageElement)
+          }
+        }
+      })
+
+      document.getElementById("code-btn").addEventListener("click", () => {
+        insertMarkdown("`", "`", "code")
+      })
+
+      document.getElementById("list-btn").addEventListener("click", () => {
+        insertMarkdown("- ", "", "List item")
+      })
+
+      document.getElementById("quote-btn").addEventListener("click", () => {
+        insertMarkdown("> ", "", "Quote")
+      })
+
+      function insertMarkdown(before, after, placeholder) {
+        const start = editor.selectionStart
+        const end = editor.selectionEnd
+        const selectedText = editor.value.substring(start, end)
+        const replacement = before + (selectedText || placeholder) + after
+
+        editor.value = editor.value.substring(0, start) + replacement + editor.value.substring(end)
+
+        const newCursorPos = selectedText ? start + replacement.length : start + before.length + placeholder.length
+        editor.setSelectionRange(newCursorPos, newCursorPos)
+        editor.focus()
+
+        const event = new Event("input")
+        editor.dispatchEvent(event)
+      }
+    }
   }
 
   async function publishDraft(postSlug) {
@@ -1608,199 +2305,172 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function formatTime(dateString) {
-    if (!dateString) return ""
-    const date = new Date(dateString)
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
+  function renderProfilePage() {
+    if (!isAuthenticated()) {
+      showMessage("You must be logged in to view your profile.", "error", appContainer)
+      renderAuthForm("login")
+      return
+    }
+
+    appContainer.innerHTML = `
+      <div class="profile-page">
+        <div class="profile-container">
+          <div class="profile-sidebar">
+            <div class="profile-header">
+              <div class="profile-avatar">
+                <img src="${user.profilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="profile-avatar-large" alt="Profile Avatar" />
+              </div>
+              <div class="profile-info">
+                <h2>@${user.username}</h2>
+                <p>${user.email || "No email provided"}</p>
+                <div class="user-roles">
+                  ${user.roles.map((role) => `<span class="role-badge ${role.toLowerCase()}">${role}</span>`).join("")}
+                </div>
+              </div>
+            </div>
+            
+            <nav class="profile-nav">
+              <button class="profile-nav-btn active" data-section="edit-profile">
+                <i class="fas fa-user-edit"></i>
+                Edit Profile
+              </button>
+              <button class="profile-nav-btn" data-section="change-password">
+                <i class="fas fa-key"></i>
+                Change Password
+              </button>
+              <button class="profile-nav-btn logout-btn" id="profile-logout">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+              </button>
+            </nav>
+          </div>
+          
+          <div class="profile-content">
+            <div id="profile-section-content">
+              <div class="loading-posts">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+
+    document.querySelectorAll(".profile-nav-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        if (btn.id === "profile-logout") {
+          clearAuthData()
+          currentPage = "feed"
+          renderAppContent()
+          return
+        }
+
+        const section = btn.dataset.section
+        document.querySelectorAll(".profile-nav-btn").forEach((b) => b.classList.remove("active"))
+        btn.classList.add("active")
+        loadProfileSection(section)
+      })
     })
+
+    loadProfileSection("edit-profile")
   }
 
-  function updateNav() {
-    mainNav.innerHTML = ""
-    if (isAuthenticated()) {
-      mainNav.innerHTML = `
-                <div class="nav-links">
-                    <button class="nav-btn ${currentPage === "feed" ? "active" : ""}" data-page="feed">
-                        <i class="fas fa-home"></i> My Feed
-                    </button>
-                    <button class="nav-btn ${currentPage === "drafts" ? "active" : ""}" data-page="drafts">
-                        <i class="fas fa-edit"></i> My Drafts & Posts
-                    </button>
-                    ${
-                      user.roles && user.roles.includes("Admin")
-                        ? `
-                          <button class="nav-btn ${currentPage === "admin" ? "active" : ""}" data-page="admin">
-                              <i class="fas fa-shield-alt"></i> Admin Panel
-                          </button>
-                          `
-                        : ""
-                    }
-               </div>
-                <div class="nav-user">
-                 <div class="dropdown">
-                   <button class="dropdown-toggle" id="profile-dropdown">
-                     <img src="${user.profilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="avatar-img" alt="Avatar" />
-                     <span>${user.username}</span>
-                     <i class="fas fa-chevron-down"></i>
-                   </button>
-                   <div class="dropdown-menu" id="profile-menu">
-                     <a href="#" class="dropdown-item" id="edit-profile-btn">
-                       <i class="fas fa-user-edit"></i> Edit Profile
-                     </a>
-                     <a href="#" class="dropdown-item" id="change-password-btn">
-                       <i class="fas fa-key"></i> Change Password
-                     </a>
-                     <a href="#" class="dropdown-item" id="nav-logout">
-                       <i class="fas fa-sign-out-alt"></i> Logout
-                     </a>
-                   </div>
-                 </div>
-               </div>
-            `
+  function loadProfileSection(section) {
+    const contentContainer = document.getElementById("profile-section-content")
 
-      document.getElementById("profile-dropdown").addEventListener("click", (e) => {
-        e.stopPropagation()
-        document.getElementById("profile-menu").classList.toggle("show")
-      })
-
-      document.addEventListener("click", () => {
-        document.getElementById("profile-menu").classList.remove("show")
-      })
-
-      document.getElementById("edit-profile-btn").addEventListener("click", (e) => {
-        e.preventDefault()
-        showEditProfileModal()
-      })
-
-      document.getElementById("change-password-btn").addEventListener("click", (e) => {
-        e.preventDefault()
-        showChangePasswordModal()
-      })
-
-      document.getElementById("nav-logout").addEventListener("click", () => {
-        clearAuthData()
-        currentPage = "feed"
-        renderAppContent()
-      })
-
-      document.querySelectorAll(".nav-btn[data-page]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          currentPage = btn.dataset.page
-          renderAppContent()
-        })
-      })
-    } else {
-      mainNav.innerHTML = `
-                    <button class="nav-btn ${currentPage === "login" ? "active" : ""}" data-page="login" id="nav-login">
-                        <i class="fas fa-sign-in-alt"></i> Login
-                    </button>
-                    <button class="nav-btn ${currentPage === "signup" ? "active" : ""}" data-page="signup" id="nav-signup">
-                        <i class="fas fa-user-plus"></i> Sign Up
-                    </button>
-                `
-      document.getElementById("nav-login").addEventListener("click", () => {
-        currentPage = "login"
-        renderAuthForm("login")
-      })
-      document.getElementById("nav-signup").addEventListener("click", () => {
-        currentPage = "signup"
-        renderAuthForm("signup")
-      })
+    switch (section) {
+      case "edit-profile":
+        renderEditProfileSection(contentContainer)
+        break
+      case "change-password":
+        renderChangePasswordSection(contentContainer)
+        break
+      default:
+        renderEditProfileSection(contentContainer)
     }
   }
 
-  function showEditProfileModal() {
-    const modalHtml = `
-    <div class="modal-overlay" id="edit-profile-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Edit Profile</h3>
-          <button class="modal-close" id="close-edit-profile-modal">&times;</button>
+  function renderEditProfileSection(container) {
+    container.innerHTML = `
+      <div class="profile-section">
+        <div class="section-header">
+          <h3><i class="fas fa-user-edit"></i> Edit Profile</h3>
+          <p>Update your profile information</p>
         </div>
-        <form id="edit-profile-form" class="modal-form">
+        
+        <form id="edit-profile-form" class="profile-form">
           <div class="form-group">
             <label for="edit-username">Username</label>
-            <input type="text" id="edit-username" value="${user.username}" required>
+            <input type="text" id="edit-username" value="${user.username}" required readonly>
+            <small class="form-text">Username cannot be changed</small>
           </div>
+          
           <div class="form-group">
             <label for="edit-email">Email</label>
             <input type="email" id="edit-email" value="${user.email || ""}" required>
           </div>
+          
           <div class="form-group">
             <label for="edit-profile-picture">Profile Picture</label>
             <input type="file" id="edit-profile-picture" accept="image/*">
             <div class="current-picture" style="margin-top: 10px;">
               <img src="${user.profilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" 
                    alt="Current Profile Picture" 
-                   style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;">
+                   class="profile-preview-img">
             </div>
           </div>
-          <div class="modal-actions">
-          <button class="btn btn-danger btn-sm delete-user-btn" data-username="${user.username}">
-                <i class="fas fa-trash"></i> Delete account
-              </button>
-            <button type="button" class="btn btn-outline" id="cancel-edit-profile">Cancel</button>
-            <button type="submit" class="btn btn-primary">Update Profile</button>
+          
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save"></i>
+              Update Profile
+            </button>
+            <button type="button" class="btn btn-danger delete-account-btn" data-username="${user.username}">
+              <i class="fas fa-trash"></i>
+              Delete Account
+            </button>
           </div>
+          
           <div id="edit-profile-message" class="message" style="display: none;"></div>
         </form>
       </div>
-    </div>
-  `
+    `
 
-    document.body.insertAdjacentHTML("beforeend", modalHtml)
-
-    const modal = document.getElementById("edit-profile-modal")
     const form = document.getElementById("edit-profile-form")
-    const closeBtn = document.getElementById("close-edit-profile-modal")
-    const cancelBtn = document.getElementById("cancel-edit-profile")
-    const deleteUserBtn = document.querySelector(".delete-user-btn")
+    const deleteAccountBtn = document.querySelector(".delete-account-btn")
     const messageElement = document.getElementById("edit-profile-message")
 
-    const closeModal = () => modal.remove()
-
-    closeBtn.addEventListener("click", closeModal)
-    cancelBtn.addEventListener("click", closeModal)
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) closeModal()
-    })
-
-    deleteUserBtn.addEventListener("click", async (e) => {
+    deleteAccountBtn.addEventListener("click", async (e) => {
       e.preventDefault()
+      const username = deleteAccountBtn.dataset.username
 
-      const username = deleteUserBtn.dataset.username
+      if (confirm(`Are you sure you want to delete your account ${username}? This action cannot be undone.`)) {
+        try {
+          const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-user/${username}`, {
+            method: "DELETE",
+          })
 
-      if (confirm(`Are you sure you want to delete your account ${username}?`)) {
-      try {
-        const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-user/${username}`, {
-        method: "DELETE",
-        })
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.message || "Failed to delete account")
+          }
 
-        if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to delete account")
+          showMessage("Account deleted successfully!", "success", messageElement)
+          setTimeout(() => {
+            clearAuthData()
+            currentPage = "feed"
+            renderAppContent()
+          }, 1500)
+        } catch (error) {
+          showMessage(error.message, "error", messageElement)
         }
-
-        showMessage("Account deleted successfully!", "success", messageElement)
-        setTimeout(() => {
-          closeModal()
-          clearAuthData()
-          currentPage = "feed"
-          renderAppContent()
-        }, 1500)
-      } catch (error) {
-        showMessage(error.message, "error", messageElement)
-      }
       }
     })
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault()
 
-      const username = document.getElementById("edit-username").value
       const email = document.getElementById("edit-email").value
       const profilePictureFile = document.getElementById("edit-profile-picture").files[0]
 
@@ -1831,62 +2501,59 @@ document.addEventListener("DOMContentLoaded", () => {
         saveAuthData()
 
         showMessage("Profile updated successfully!", "success", messageElement)
-        setTimeout(() => {
-          closeModal()
-          renderAppContent()
-        }, 1500)
+
+        const sidebarAvatar = document.querySelector(".profile-avatar-large")
+        const previewImg = document.querySelector(".profile-preview-img")
+        if (sidebarAvatar && updatedUser.profilePictureUrl) {
+          sidebarAvatar.src = updatedUser.profilePictureUrl
+        }
+        if (previewImg && updatedUser.profilePictureUrl) {
+          previewImg.src = updatedUser.profilePictureUrl
+        }
       } catch (error) {
         showMessage(error.message, "error", messageElement)
       }
     })
   }
 
-  function showChangePasswordModal() {
-    const modalHtml = `
-    <div class="modal-overlay" id="change-password-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Change Password</h3>
-          <button class="modal-close" id="close-change-password-modal">&times;</button>
+  function renderChangePasswordSection(container) {
+    container.innerHTML = `
+      <div class="profile-section">
+        <div class="section-header">
+          <h3><i class="fas fa-key"></i> Change Password</h3>
+          <p>Update your account password</p>
         </div>
-        <form id="change-password-form" class="modal-form">
+        
+        <form id="change-password-form" class="profile-form">
           <div class="form-group">
             <label for="current-password">Current Password</label>
             <input type="password" id="current-password" required>
           </div>
+          
           <div class="form-group">
             <label for="new-password">New Password</label>
             <input type="password" id="new-password" required>
           </div>
+          
           <div class="form-group">
             <label for="confirm-new-password">Confirm New Password</label>
             <input type="password" id="confirm-new-password" required>
           </div>
-          <div class="modal-actions">
-            <button type="button" class="btn btn-outline" id="cancel-change-password">Cancel</button>
-            <button type="submit" class="btn btn-primary">Change Password</button>
+          
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-key"></i>
+              Change Password
+            </button>
           </div>
+          
           <div id="change-password-message" class="message" style="display: none;"></div>
         </form>
       </div>
-    </div>
-  `
+    `
 
-    document.body.insertAdjacentHTML("beforeend", modalHtml)
-
-    const modal = document.getElementById("change-password-modal")
     const form = document.getElementById("change-password-form")
-    const closeBtn = document.getElementById("close-change-password-modal")
-    const cancelBtn = document.getElementById("cancel-change-password")
     const messageElement = document.getElementById("change-password-message")
-
-    const closeModal = () => modal.remove()
-
-    closeBtn.addEventListener("click", closeModal)
-    cancelBtn.addEventListener("click", closeModal)
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) closeModal()
-    })
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault()
@@ -1929,13 +2596,71 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         showMessage("Password changed successfully!", "success", messageElement)
-        setTimeout(() => {
-          closeModal()
-        }, 1500)
+        form.reset()
       } catch (error) {
         showMessage(error.message, "error", messageElement)
       }
     })
+  }
+
+  function updateNav() {
+    mainNav.innerHTML = ""
+    if (isAuthenticated()) {
+      mainNav.innerHTML = `
+                <div class="nav-links">
+                    <button class="nav-btn ${currentPage === "feed" ? "active" : ""}" data-page="feed">
+                        <i class="fas fa-home"></i> My Feed
+                    </button>
+                    <button class="nav-btn ${currentPage === "drafts" ? "active" : ""}" data-page="drafts">
+                        <i class="fas fa-edit"></i> My Drafts & Posts
+                    </button>
+                    ${
+                      user.roles && user.roles.includes("Admin")
+                        ? `
+                          <button class="nav-btn ${currentPage === "admin" ? "active" : ""}" data-page="admin">
+                              <i class="fas fa-shield-alt"></i> Admin Panel
+                          </button>
+                          `
+                        : ""
+                    }
+               </div>
+                <div class="nav-user">
+                   <button class="profile-btn" id="profile-btn">
+                     <img src="${user.profilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="avatar-img" alt="Avatar" />
+                     <span style="color: #1a1a1a;">${user.username}</span>
+                   </button>
+               </div>
+            `
+
+      document.getElementById("profile-btn").addEventListener("click", () => {
+        currentPage = "profile"
+        renderAppContent()
+      })
+
+      document.querySelectorAll(".nav-btn[data-page]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          currentPage = btn.dataset.page
+          renderAppContent()
+        })
+      })
+    } else {
+      mainNav.innerHTML = `
+                    <button class="nav-btn ${currentPage === "login" ? "active" : ""}" data-page="login" id="nav-login">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                    <button class="nav-btn ${currentPage === "signup" ? "active" : ""}" data-page="signup" id="nav-signup">
+                        <i class="fas fa-user-plus"></i> Sign Up
+                    </button>
+                `
+      document.getElementById("nav-login").addEventListener("click", () => {
+        currentPage = "login"
+        renderAuthForm("login")
+      })
+      document.getElementById("nav-signup").addEventListener("click", () => {
+        currentPage = "signup"
+        renderAuthForm("signup")
+      })
+    }
   }
 
   async function renderAdminPage() {
@@ -1950,99 +2675,134 @@ document.addEventListener("DOMContentLoaded", () => {
     <div class="admin-page">
       <div class="page-header">
         <h2><i class="fas fa-shield-alt"></i> Admin Panel</h2>
-        <p>Manage users, categories, and tags</p>
+        <p>Manage your blog platform</p>
       </div>
       
-      <div class="admin-sections">
-        <!-- User Management Section -->
-        <div class="admin-section">
-          <div class="section-header">
-            <h3><i class="fas fa-users"></i> User Management</h3>
-            <div class="section-stats">
-              <span id="users-count">Loading...</span>
-            </div>
-          </div>
-          <div id="users-container" class="admin-container">
-            <div class="loading-posts">
-              <i class="fas fa-spinner fa-spin"></i>
-              <p>Loading users...</p>
-            </div>
-          </div>
+      <div class="admin-navigation">
+        <div class="admin-nav-buttons">
+          <button class="admin-nav-btn ${currentAdminSection === "users" ? "active" : ""}" data-section="users">
+            <i class="fas fa-users"></i> User Management
+          </button>
+          <button class="admin-nav-btn ${currentAdminSection === "categories" ? "active" : ""}" data-section="categories">
+            <i class="fas fa-folder"></i> Categories Management
+          </button>
+          <button class="admin-nav-btn ${currentAdminSection === "tags" ? "active" : ""}" data-section="tags">
+            <i class="fas fa-tags"></i> Tags Management
+          </button>
+          <button class="admin-nav-btn ${currentAdminSection === "posts" ? "active" : ""}" data-section="posts">
+            <i class="fas fa-file-alt"></i> Posts Management
+          </button>
         </div>
-
-        <!-- Categories Management Section -->
-        <div class="admin-section">
-          <div class="section-header">
-            <h3><i class="fas fa-folder"></i> Categories Management</h3>
-            <button class="btn btn-primary" id="add-category-btn">
-              <i class="fas fa-plus"></i> Add Category
-            </button>
-          </div>
-          <div id="categories-container" class="admin-container">
-            <div class="loading-posts">
-              <i class="fas fa-spinner fa-spin"></i>
-              <p>Loading categories...</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tags Management Section -->
-        <div class="admin-section">
-          <div class="section-header">
-            <h3><i class="fas fa-tags"></i> Tags Management</h3>
-            <button class="btn btn-primary" id="add-tag-btn">
-              <i class="fas fa-plus"></i> Add Tag
-            </button>
-          </div>
-          <div id="tags-container" class="admin-container">
-            <div class="loading-posts">
-              <i class="fas fa-spinner fa-spin"></i>
-              <p>Loading tags...</p>
-            </div>
-          </div>
+      </div>
+      
+      <div id="admin-content" class="admin-content">
+        <div class="loading-posts">
+          <i class="fas fa-spinner fa-spin"></i>
+          <p>Loading...</p>
         </div>
       </div>
     </div>
   `
 
-    loadAdminData()
+    document.querySelectorAll(".admin-nav-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        currentAdminSection = btn.dataset.section
+        document.querySelectorAll(".admin-nav-btn").forEach((b) => b.classList.remove("active"))
+        btn.classList.add("active")
+        loadAdminSection(currentAdminSection)
+      })
+    })
+
+    loadAdminSection(currentAdminSection)
   }
 
-  async function loadAdminData() {
-    await Promise.all([loadUsersAdmin(), loadCategoriesAdmin(), loadTagsAdmin()])
+  async function loadAdminSection(section) {
+    const adminContent = document.getElementById("admin-content")
+
+    adminContent.innerHTML = `
+      <div class="loading-posts">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>Loading ${section}...</p>
+      </div>
+    `
+
+    switch (section) {
+      case "users":
+        await loadUsersAdmin()
+        break
+      case "categories":
+        await loadCategoriesAdmin()
+        break
+      case "tags":
+        await loadTagsAdmin()
+        break
+      case "posts":
+        await loadPostsAdmin()
+        break
+      default:
+        await loadUsersAdmin()
+    }
   }
 
   async function loadUsersAdmin() {
-    const usersContainer = document.getElementById("users-container")
-    const usersCount = document.getElementById("users-count")
+    const adminContent = document.getElementById("admin-content")
 
     try {
       const response = await fetchAuthenticated(`${API_BASE_URL}/api/users`)
       if (!response.ok) throw new Error("Failed to fetch users")
 
       const allUsers = await response.json()
-      const users = allUsers.filter(user => user.isActive === true)
-      usersContainer.innerHTML = ""
-      usersCount.textContent = `${users.length} users`
+      const users = allUsers.filter((user) => user.isActive === true)
+
+      adminContent.innerHTML = `
+        <div class="admin-section">
+          <div class="section-header">
+            <h3><i class="fas fa-users"></i> User Management</h3>
+            <div class="section-stats">
+              <span>${users.length} users</span>
+            </div>
+          </div>
+          <div id="users-container" class="admin-container">
+          </div>
+        </div>
+      `
+
+      const usersContainer = document.getElementById("users-container")
 
       users.forEach((user) => {
         const userCard = document.createElement("div")
-        userCard.className = "admin-item-card"
+        userCard.className = "admin-item-card user-management-card"
         userCard.innerHTML = `
-        <div class="admin-item-header">
-          <div class="admin-item-info">
-            <h4>@${user.username}</h4>
-            <p>${user.email}</p>
-            <div class="user-roles">
+        <div class="user-card-header">
+          <div class="user-avatar-section">
+            <img src="${user.profilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" 
+                 class="user-admin-avatar" alt="User Avatar" />
+            <div class="user-basic-info">
+              <h4 class="user-admin-name">@${user.username}</h4>
+              <p class="user-admin-email">${user.email}</p>
+            </div>
+          </div>
+          <div class="user-status-indicator ${user.roles.includes("Admin") ? "admin-status" : "author-status"}">
+            <i class="fas ${user.roles.includes("Admin") ? "fa-shield-alt" : "fa-user"}"></i>
+          </div>
+        </div>
+        
+        <div class="user-roles-section">
+          <div class="roles-display">
+            <span class="roles-label">Roles:</span>
+            <div class="user-roles-list">
               ${user.roles.map((role) => `<span class="role-badge ${role.toLowerCase()}">${role}</span>`).join("")}
             </div>
           </div>
-          <div class="admin-item-actions">
+        </div>
+        
+        <div class="user-actions-section">
+          <div class="role-management">
             ${
               !user.roles.includes("Admin")
                 ? `
               <button class="btn btn-success btn-sm make-admin-btn" data-username="${user.username}">
-                <i class="fas fa-user-shield"></i> Make Admin
+                <i class="fas fa-user-shield"></i> Promote to Admin
               </button>
             `
                 : user.username !== window.user?.username
@@ -2051,16 +2811,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 <i class="fas fa-user-minus"></i> Remove Admin
               </button>
             `
-                  : ""
+                  : `<span class="current-user-badge"><i class="fas fa-star"></i> Current User</span>`
             }
+          </div>
+          <div class="user-management">
             ${
               user.username !== window.user?.username
                 ? `
               <button class="btn btn-danger btn-sm delete-user-btn" data-username="${user.username}">
-                <i class="fas fa-trash"></i> Delete
+                <i class="fas fa-trash-alt"></i> Delete User
               </button>
             `
-                : '<span class="text-muted">Current User</span>'
+                : ""
             }
           </div>
         </div>
@@ -2071,7 +2833,7 @@ document.addEventListener("DOMContentLoaded", () => {
       usersContainer.querySelectorAll(".make-admin-btn").forEach((btn) => {
         btn.addEventListener("click", async (e) => {
           const username = e.target.dataset.username
-          if (confirm(`Make ${username} an admin?`)) {
+          if (confirm(`Promote ${username} to admin? They will have full administrative privileges.`)) {
             await toggleUserAdmin(username, true)
             loadUsersAdmin()
           }
@@ -2081,7 +2843,7 @@ document.addEventListener("DOMContentLoaded", () => {
       usersContainer.querySelectorAll(".remove-admin-btn").forEach((btn) => {
         btn.addEventListener("click", async (e) => {
           const username = e.target.dataset.username
-          if (confirm(`Remove admin privileges from ${username}?`)) {
+          if (confirm(`Remove admin privileges from ${username}? They will become a regular author.`)) {
             await toggleUserAdmin(username, false)
             loadUsersAdmin()
           }
@@ -2091,32 +2853,49 @@ document.addEventListener("DOMContentLoaded", () => {
       usersContainer.querySelectorAll(".delete-user-btn").forEach((btn) => {
         btn.addEventListener("click", async (e) => {
           const username = e.target.dataset.username
-          if (confirm(`Delete user ${username}? This action cannot be undone.`)) {
+          if (
+            confirm(
+              `Delete user ${username}? This will permanently remove their account and all associated data. This action cannot be undone.`,
+            )
+          ) {
             await deleteUser(username)
             loadUsersAdmin()
           }
         })
       })
     } catch (error) {
-      usersContainer.innerHTML = `
+      adminContent.innerHTML = `
       <div class="error-state">
         <i class="fas fa-exclamation-triangle"></i>
         <p>Error loading users: ${error.message}</p>
       </div>
     `
-      usersCount.textContent = "Error"
     }
   }
 
   async function loadCategoriesAdmin() {
-    const categoriesContainer = document.getElementById("categories-container")
+    const adminContent = document.getElementById("admin-content")
 
     try {
       const response = await fetchAuthenticated(`${API_BASE_URL}/api/categories`)
       if (!response.ok) throw new Error("Failed to fetch categories")
 
       const categories = await response.json()
-      categoriesContainer.innerHTML = ""
+
+      adminContent.innerHTML = `
+        <div class="admin-section">
+          <div class="section-header">
+            <h3><i class="fas fa-folder"></i> Categories Management</h3>
+            <button class="btn btn-primary" id="add-category-btn">
+              <i class="fas fa-plus"></i> Add Category
+            </button>
+          </div>
+          <div id="categories-container" class="admin-container">
+          </div>
+        </div>
+      `
+
+      const categoriesContainer = document.getElementById("categories-container")
 
       if (categories.length === 0) {
         categoriesContainer.innerHTML = `
@@ -2126,71 +2905,84 @@ document.addEventListener("DOMContentLoaded", () => {
           <p>Create your first category</p>
         </div>
       `
-        return
+      } else {
+        categories.forEach((category) => {
+          const categoryCard = document.createElement("div")
+          categoryCard.className = "admin-item-card"
+          categoryCard.innerHTML = `
+          <div class="admin-item-header">
+            <div class="admin-item-info">
+              <h4>${category.name}</h4>
+              <p>${category.description || "No description"}</p>
+            </div>
+            <div class="admin-item-actions">
+              <button class="btn btn-outline btn-sm edit-category-btn" data-category='${JSON.stringify(category)}'>
+                <i class="fas fa-edit"></i> Edit
+              </button>
+              <button class="btn btn-danger btn-sm delete-category-btn" data-id="${category.id}" data-name="${category.name}">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            </div>
+          </div>
+        `
+          categoriesContainer.appendChild(categoryCard)
+        })
+
+        categoriesContainer.querySelectorAll(".edit-category-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const category = JSON.parse(e.target.dataset.category)
+            showCategoryModal(category)
+          })
+        })
+
+        categoriesContainer.querySelectorAll(".delete-category-btn").forEach((btn) => {
+          btn.addEventListener("click", async (e) => {
+            const id = e.target.dataset.id
+            const name = e.target.dataset.name
+            if (confirm(`Delete category "${name}"? This action cannot be undone.`)) {
+              await deleteCategory(id)
+              loadCategoriesAdmin()
+            }
+          })
+        })
       }
 
-      categories.forEach((category) => {
-        const categoryCard = document.createElement("div")
-        categoryCard.className = "admin-item-card"
-        categoryCard.innerHTML = `
-        <div class="admin-item-header">
-          <div class="admin-item-info">
-            <h4>${category.name}</h4>
-            <p>${category.description || "No description"}</p>
-          </div>
-          <div class="admin-item-actions">
-            <button class="btn btn-outline btn-sm edit-category-btn" data-category='${JSON.stringify(category)}'>
-              <i class="fas fa-edit"></i> Edit
-            </button>
-            <button class="btn btn-danger btn-sm delete-category-btn" data-id="${category.id}" data-name="${category.name}">
-              <i class="fas fa-trash"></i> Delete
-            </button>
-          </div>
-        </div>
-      `
-        categoriesContainer.appendChild(categoryCard)
-      })
-
-      categoriesContainer.querySelectorAll(".edit-category-btn").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-          const category = JSON.parse(e.target.dataset.category)
-          showCategoryModal(category)
-        })
-      })
-
-      categoriesContainer.querySelectorAll(".delete-category-btn").forEach((btn) => {
-        btn.addEventListener("click", async (e) => {
-          const id = e.target.dataset.id
-          const name = e.target.dataset.name
-          if (confirm(`Delete category "${name}"? This action cannot be undone.`)) {
-            await deleteCategory(id)
-            loadCategoriesAdmin()
-          }
-        })
+      document.getElementById("add-category-btn").addEventListener("click", () => {
+        showCategoryModal()
       })
     } catch (error) {
-      categoriesContainer.innerHTML = `
+      adminContent.innerHTML = `
       <div class="error-state">
         <i class="fas fa-exclamation-triangle"></i>
         <p>Error loading categories: ${error.message}</p>
       </div>
     `
     }
-
-    document.getElementById("add-category-btn").addEventListener("click", () => {
-      showCategoryModal()
-    })
   }
 
   async function loadTagsAdmin() {
-    const tagsContainer = document.getElementById("tags-container")
+    const adminContent = document.getElementById("admin-content")
 
     try {
       const response = await fetchAuthenticated(`${API_BASE_URL}/api/tags`)
       if (!response.ok) throw new Error("Failed to fetch tags")
 
       const tags = await response.json()
-      tagsContainer.innerHTML = ""
+
+      adminContent.innerHTML = `
+        <div class="admin-section">
+          <div class="section-header">
+            <h3><i class="fas fa-tags"></i> Tags Management</h3>
+            <button class="btn btn-primary" id="add-tag-btn">
+              <i class="fas fa-plus"></i> Add Tag
+            </button>
+          </div>
+          <div id="tags-container" class="admin-container">
+          </div>
+        </div>
+      `
+
+      const tagsContainer = document.getElementById("tags-container")
 
       if (tags.length === 0) {
         tagsContainer.innerHTML = `
@@ -2200,112 +2992,141 @@ document.addEventListener("DOMContentLoaded", () => {
           <p>Create your first tag</p>
         </div>
       `
-        return
+      } else {
+        tags.forEach((tag) => {
+          const tagCard = document.createElement("div")
+          tagCard.className = "admin-item-card"
+          tagCard.innerHTML = `
+          <div class="admin-item-header">
+            <div class="admin-item-info">
+              <h4>${tag.name}</h4>
+            </div>
+            <div class="admin-item-actions">
+              <button class="btn btn-outline btn-sm edit-tag-btn" data-tag='${JSON.stringify(tag)}'>
+                <i class="fas fa-edit"></i> Edit
+              </button>
+              <button class="btn btn-danger btn-sm delete-tag-btn" data-id="${tag.id}" data-name="${tag.name}">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            </div>
+          </div>
+        `
+          tagsContainer.appendChild(tagCard)
+        })
+
+        tagsContainer.querySelectorAll(".edit-tag-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const tag = JSON.parse(e.target.dataset.tag)
+            showTagModal(tag)
+          })
+        })
+
+        tagsContainer.querySelectorAll(".delete-tag-btn").forEach((btn) => {
+          btn.addEventListener("click", async (e) => {
+            const id = e.target.dataset.id
+            const name = e.target.dataset.name
+            if (confirm(`Delete tag "${name}"? This action cannot be undone.`)) {
+              await deleteTag(id)
+              loadTagsAdmin()
+            }
+          })
+        })
       }
 
-      tags.forEach((tag) => {
-        const tagCard = document.createElement("div")
-        tagCard.className = "admin-item-card"
-        tagCard.innerHTML = `
-        <div class="admin-item-header">
-          <div class="admin-item-info">
-            <h4>${tag.name}</h4>
-          </div>
-          <div class="admin-item-actions">
-            <button class="btn btn-outline btn-sm edit-tag-btn" data-tag='${JSON.stringify(tag)}'>
-              <i class="fas fa-edit"></i> Edit
-            </button>
-            <button class="btn btn-danger btn-sm delete-tag-btn" data-id="${tag.id}" data-name="${tag.name}">
-              <i class="fas fa-trash"></i> Delete
-            </button>
-          </div>
-        </div>
-      `
-        tagsContainer.appendChild(tagCard)
-      })
-
-      tagsContainer.querySelectorAll(".edit-tag-btn").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-          const tag = JSON.parse(e.target.dataset.tag)
-          showTagModal(tag)
-        })
-      })
-
-      tagsContainer.querySelectorAll(".delete-tag-btn").forEach((btn) => {
-        btn.addEventListener("click", async (e) => {
-          const id = e.target.dataset.id
-          const name = e.target.dataset.name
-          if (confirm(`Delete tag "${name}"? This action cannot be undone.`)) {
-            await deleteTag(id)
-            loadTagsAdmin()
-          }
-        })
+      document.getElementById("add-tag-btn").addEventListener("click", () => {
+        showTagModal()
       })
     } catch (error) {
-      tagsContainer.innerHTML = `
+      adminContent.innerHTML = `
       <div class="error-state">
         <i class="fas fa-exclamation-triangle"></i>
         <p>Error loading tags: ${error.message}</p>
       </div>
     `
     }
-
-    document.getElementById("add-tag-btn").addEventListener("click", () => {
-      showTagModal()
-    })
   }
 
-  async function toggleUserAdmin(username, makeAdmin) {
+  async function loadPostsAdmin() {
+    const adminContent = document.getElementById("admin-content")
+
     try {
-      const getUserResponse = await fetchAuthenticated(`${API_BASE_URL}/api/user/${username}`)
-      if (!getUserResponse.ok) throw new Error("Failed to fetch user")
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/posts`)
+      if (!response.ok) throw new Error("Failed to fetch posts")
 
-      const userData = await getUserResponse.json()
-      let newRoles = [...userData.roles]
+      const posts = await response.json()
 
-      if (makeAdmin && !newRoles.includes("Admin")) {
-        newRoles.push("Admin")
-      } else if (!makeAdmin && newRoles.includes("Admin")) {
-        newRoles = newRoles.filter((role) => role !== "Admin")
-      }
+      adminContent.innerHTML = `
+        <div class="admin-section">
+          <div class="section-header">
+            <h3><i class="fas fa-file-alt"></i> Posts Management</h3>
+            <div class="section-stats">
+              <span>${posts.length} posts</span>
+            </div>
+          </div>
+          <div id="posts-container" class="admin-container">
+          </div>
+        </div>
+      `
 
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/update-user/${username}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          email: userData.email,
-          roles: newRoles,
-        }),
-      })
+      const postsContainer = document.getElementById("posts-container")
 
-      if (!response.ok) throw new Error("Failed to update user")
-
-      showMessage(
-        `User ${username} ${makeAdmin ? "promoted to" : "removed from"} admin successfully!`,
-        "success",
-        appContainer,
-      )
-      return true
-    } catch (error) {
-      showMessage(`Error updating user: ${error.message}`, "error", appContainer)
-      return false
-    }
-  }
-
-  async function deleteUser(username) {
-    try {
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-user/${username}`, {
-        method: "DELETE",
-      })
-
-      if (response.status === 204) {
-        showMessage(`User ${username} deleted successfully!`, "success", appContainer)
-        return true
+      if (posts.length === 0) {
+        postsContainer.innerHTML = `
+        <div class="empty-state">
+          <i class="fas fa-file-alt"></i>
+          <h3>No posts yet</h3>
+          <p>Posts will appear here when users create them</p>
+        </div>
+      `
       } else {
-        throw new Error("Failed to delete user")
+        const enrichedPosts = await fetchPostsWithProfilePictures(posts)
+
+        enrichedPosts.forEach((post) => {
+          const postCard = createPostCard(post)
+
+          const cardContent = postCard.querySelector(".post-card-content")
+          const actionsHtml = `
+            <div class="post-card-actions" style="margin-top: 1rem; padding-top: 1rem; display: flex; gap: 0.5rem; border-top: 1px solid #f0f0f0;">
+              <button class="btn btn-outline btn-sm view-post-btn" data-post-slug="${post.slug}">
+                <i class="fas fa-eye"></i> View
+              </button>
+              <button class="btn btn-danger btn-sm delete-post-admin-btn" data-post-slug="${post.slug}" data-title="${post.title}">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            </div>
+          `
+          cardContent.insertAdjacentHTML("beforeend", actionsHtml)
+
+          postsContainer.appendChild(postCard)
+        })
+
+        postsContainer.querySelectorAll(".view-post-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const postSlug = e.target.dataset.postSlug
+            currentPage = "blog-post"
+            currentPostSlug = postSlug
+            renderBlogPostPage(postSlug)
+          })
+        })
+
+        postsContainer.querySelectorAll(".delete-post-admin-btn").forEach((btn) => {
+          btn.addEventListener("click", async (e) => {
+            const postSlug = e.target.dataset.postSlug
+            const title = e.target.dataset.title
+            if (confirm(`Delete post "${title}"? This action cannot be undone.`)) {
+              await deletePost(postSlug)
+              loadPostsAdmin()
+            }
+          })
+        })
       }
     } catch (error) {
-      showMessage(`Error deleting user: ${error.message}`, "error", appContainer)
-      return false
+      adminContent.innerHTML = `
+      <div class="error-state">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>Error loading posts: ${error.message}</p>
+      </div>
+    `
     }
   }
 
@@ -2329,10 +3150,9 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
           <div class="modal-actions">
             <button type="button" class="btn btn-outline" id="cancel-category">Cancel</button>
-            <button type="submit" class="btn btn-primary">
-              ${isEdit ? "Update" : "Create"} Category
-            </button>
+            <button type="submit" class="btn btn-primary">${isEdit ? "Update" : "Create"} Category</button>
           </div>
+          <div id="category-message" class="message" style="display: none;"></div>
         </form>
       </div>
     </div>
@@ -2344,10 +3164,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("category-form")
     const closeBtn = document.getElementById("close-category-modal")
     const cancelBtn = document.getElementById("cancel-category")
+    const messageElement = document.getElementById("category-message")
 
-    const closeModal = () => {
-      modal.remove()
-    }
+    const closeModal = () => modal.remove()
 
     closeBtn.addEventListener("click", closeModal)
     cancelBtn.addEventListener("click", closeModal)
@@ -2357,38 +3176,44 @@ document.addEventListener("DOMContentLoaded", () => {
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault()
-      const name = document.getElementById("category-name").value
-      const description = document.getElementById("category-description").value
+
+      const name = document.getElementById("category-name").value.trim()
+      const description = document.getElementById("category-description").value.trim()
+
+      if (!name) {
+        showMessage("Category name is required", "error", messageElement)
+        return
+      }
 
       try {
+        const categoryData = { name, description }
         let response
+
         if (isEdit) {
-          response = await fetchAuthenticated(`${API_BASE_URL}/api/update-category`, {
+          response = await fetchAuthenticated(`${API_BASE_URL}/api/update-category/${category.id}`, {
             method: "PUT",
-            body: JSON.stringify({
-              id: category.id,
-              newName: name,
-              description: description,
-            }),
+            body: JSON.stringify(categoryData),
           })
         } else {
           response = await fetchAuthenticated(`${API_BASE_URL}/api/category`, {
             method: "POST",
-            body: JSON.stringify({
-              name: name,
-              description: description,
-            }),
+            body: JSON.stringify(categoryData),
           })
         }
 
-        if (!response.ok) throw new Error("Failed to save category")
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.message || `Failed to ${isEdit ? "update" : "create"} category`)
+        }
 
-        showMessage(`Category ${isEdit ? "updated" : "created"} successfully!`, "success", appContainer)
-        closeModal()
-        loadCategoriesAdmin()
-        fetchCategoriesAndTags()
+        showMessage(`Category ${isEdit ? "updated" : "created"} successfully!`, "success", messageElement)
+        setTimeout(() => {
+          closeModal()
+          loadCategoriesAdmin()
+          fetchCategoriesAndTags()
+        }, 1500)
       } catch (error) {
-        showMessage(`Error saving category: ${error.message}`, "error", form)
+        showMessage(error.message, "error", messageElement)
       }
     })
   }
@@ -2409,10 +3234,9 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
           <div class="modal-actions">
             <button type="button" class="btn btn-outline" id="cancel-tag">Cancel</button>
-            <button type="submit" class="btn btn-primary">
-              ${isEdit ? "Update" : "Create"} Tag
-            </button>
+            <button type="submit" class="btn btn-primary">${isEdit ? "Update" : "Create"} Tag</button>
           </div>
+          <div id="tag-message" class="message" style="display: none;"></div>
         </form>
       </div>
     </div>
@@ -2424,10 +3248,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("tag-form")
     const closeBtn = document.getElementById("close-tag-modal")
     const cancelBtn = document.getElementById("cancel-tag")
+    const messageElement = document.getElementById("tag-message")
 
-    const closeModal = () => {
-      modal.remove()
-    }
+    const closeModal = () => modal.remove()
 
     closeBtn.addEventListener("click", closeModal)
     cancelBtn.addEventListener("click", closeModal)
@@ -2437,109 +3260,179 @@ document.addEventListener("DOMContentLoaded", () => {
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault()
-      const name = document.getElementById("tag-name").value
+
+      const name = document.getElementById("tag-name").value.trim()
+
+      if (!name) {
+        showMessage("Tag name is required", "error", messageElement)
+        return
+      }
 
       try {
+        const tagData = { name }
         let response
+
         if (isEdit) {
-          response = await fetchAuthenticated(`${API_BASE_URL}/api/update-tag`, {
+          response = await fetchAuthenticated(`${API_BASE_URL}/api/update-tag/${tag.id}`, {
             method: "PUT",
-            body: JSON.stringify({
-              id: tag.id,
-              newName: name,
-            }),
+            body: JSON.stringify(tagData),
           })
         } else {
           response = await fetchAuthenticated(`${API_BASE_URL}/api/tag`, {
             method: "POST",
-            body: JSON.stringify({
-              name: name,
-            }),
+            body: JSON.stringify(tagData),
           })
         }
 
-        if (!response.ok) throw new Error("Failed to save tag")
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.message || `Failed to ${isEdit ? "update" : "create"} tag`)
+        }
 
-        showMessage(`Tag ${isEdit ? "updated" : "created"} successfully!`, "success", appContainer)
-        closeModal()
-        loadTagsAdmin()
-        fetchCategoriesAndTags()
+        showMessage(`Tag ${isEdit ? "updated" : "created"} successfully!`, "success", messageElement)
+        setTimeout(() => {
+          closeModal()
+          loadTagsAdmin()
+          fetchCategoriesAndTags()
+        }, 1500)
       } catch (error) {
-        showMessage(`Error saving tag: ${error.message}`, "error", form)
+        showMessage(error.message, "error", messageElement)
       }
     })
   }
 
-  async function deleteCategory(id) {
+  async function toggleUserAdmin(username, makeAdmin) {
     try {
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-category/${id}`, {
-        method: "DELETE",
+      const userResponse = await fetchAuthenticated(`${API_BASE_URL}/api/user/${username}`)
+      if (!userResponse.ok) throw new Error("Failed to fetch user data")
+
+      const userData = await userResponse.json()
+      const newRoles = makeAdmin
+        ? [...new Set([...userData.roles, "Admin"])]
+        : userData.roles.filter((role) => role !== "Admin")
+
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/update-user/${username}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          email: userData.email,
+          roles: newRoles,
+        }),
       })
 
-      if (response.status === 204) {
-        showMessage("Category deleted successfully!", "success", appContainer)
-        fetchCategoriesAndTags()
-        return true
-      } else {
-        throw new Error("Failed to delete category")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to update user roles")
       }
+
+      showMessage(
+        `User ${username} ${makeAdmin ? "promoted to" : "removed from"} admin successfully!`,
+        "success",
+        appContainer,
+      )
     } catch (error) {
-      showMessage(`Error deleting category: ${error.message}`, "error", appContainer)
-      return false
+      showMessage(error.message, "error", appContainer)
     }
   }
 
-  async function deleteTag(id) {
+  async function deleteUser(username) {
     try {
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-tag/${id}`, {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-user/${username}`, {
         method: "DELETE",
       })
 
-      if (response.status === 204) {
-        showMessage("Tag deleted successfully!", "success", appContainer)
-        fetchCategoriesAndTags()
-        return true
-      } else {
-        throw new Error("Failed to delete tag")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to delete user")
       }
+
+      showMessage(`User ${username} deleted successfully!`, "success", appContainer)
     } catch (error) {
-      showMessage(`Error deleting tag: ${error.message}`, "error", appContainer)
-      return false
+      showMessage(error.message, "error", appContainer)
+    }
+  }
+
+  async function deleteCategory(categoryId) {
+    try {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-category/${categoryId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to delete category")
+      }
+
+      showMessage("Category deleted successfully!", "success", appContainer)
+      fetchCategoriesAndTags()
+    } catch (error) {
+      showMessage(error.message, "error", appContainer)
+    }
+  }
+
+  async function deleteTag(tagId) {
+    try {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-tag/${tagId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to delete tag")
+      }
+
+      showMessage("Tag deleted successfully!", "success", appContainer)
+      fetchCategoriesAndTags()
+    } catch (error) {
+      showMessage(error.message, "error", appContainer)
     }
   }
 
   async function renderAppContent() {
-    loadAuthData()
-
-    if (CATEGORIES.length === 0 || TAGS.length === 0) {
-      appContainer.innerHTML = `
-                <div class="loading-spinner">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <p>Loading application data...</p>
-                </div>
-            `
-      await fetchCategoriesAndTags()
-    }
-
     updateNav()
 
-    const loadingSpinner = appContainer.querySelector(".loading-spinner")
-    if (loadingSpinner) {
-      loadingSpinner.remove()
+    if (currentPage === "blog-post" && currentPostSlug) {
+      await renderBlogPostPage(currentPostSlug)
+      return
     }
 
-    if (isAuthenticated()) {
-      if (currentPage === "admin") {
-        renderAdminPage()
-      } else if (currentPage === "drafts") {
-        renderDraftsPage()
-      } else {
-        renderDashboard()
-      }
-    } else {
+    if (!isAuthenticated() && currentPage !== "login" && currentPage !== "signup") {
       renderAuthForm("login")
+      return
+    }
+
+    switch (currentPage) {
+      case "feed":
+        await renderDashboard()
+        break
+      case "create-blog":
+        renderCreateBlogPage()
+        break
+      case "drafts":
+        renderDraftsPage()
+        break
+      case "profile":
+        renderProfilePage()
+        break
+      case "admin":
+        await renderAdminPage()
+        break
+      case "login":
+        renderAuthForm("login")
+        break
+      case "signup":
+        renderAuthForm("signup")
+        break
+      default:
+        await renderDashboard()
     }
   }
 
-  renderAppContent()
+  loadAuthData()
+
+  if (isAuthenticated()) {
+    await fetchCategoriesAndTags()
+    renderAppContent()
+  } else {
+    renderAuthForm("login")
+  }
 })

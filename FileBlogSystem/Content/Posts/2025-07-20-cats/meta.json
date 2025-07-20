@@ -1,0 +1,25 @@
+{
+  "Id": "6e14ca32-722e-4263-92e8-6c99b2d70ccf",
+  "Title": "Cats",
+  "Description": "",
+  "CreationDate": "0001-01-01T00:00:00",
+  "PublishedDate": "2025-07-20T21:35:30.529Z",
+  "ModificationDate": "2025-07-20T21:35:54.4891683Z",
+  "Tags": [
+    "e144a861-e956-46fa-b8f1-15170fb55044"
+  ],
+  "Categories": [
+    "21f0552e-fa31-4c12-ae23-25c2306a2c9a"
+  ],
+  "CustomUrl": null,
+  "Slug": "cats",
+  "isDraft": false,
+  "Content": "",
+  "ImageUrl": "/content/posts/2025-07-20-cats/assets/f70fc81c-42c3-48e4-bae1-df019d01985a.jpeg",
+  "AuthorUsername": "admin",
+  "ScheduledFor": null,
+  "LikedByUsers": [
+    "basma",
+    "newuser"
+  ]
+}

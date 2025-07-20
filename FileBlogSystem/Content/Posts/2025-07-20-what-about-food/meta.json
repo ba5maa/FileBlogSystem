@@ -1,0 +1,25 @@
+{
+  "Id": "66becfcd-8195-40dc-9733-82216d2191f6",
+  "Title": "what about food?",
+  "Description": "",
+  "CreationDate": "0001-01-01T00:00:00",
+  "PublishedDate": "2025-07-20T21:50:20.828Z",
+  "ModificationDate": "2025-07-20T21:57:27.461941Z",
+  "Tags": [
+    "77fc7954-162d-4724-8427-b1bb078055bb"
+  ],
+  "Categories": [
+    "2d003bab-8b65-4cda-9fab-2c9340f45b09"
+  ],
+  "CustomUrl": null,
+  "Slug": "what-about-food",
+  "isDraft": false,
+  "Content": "",
+  "ImageUrl": "/content/posts/2025-07-20-what-about-food/assets/6a04bf44-00b0-495c-b012-92fb40d767e3.png",
+  "AuthorUsername": "basma",
+  "ScheduledFor": null,
+  "LikedByUsers": [
+    "newuser",
+    "admin"
+  ]
+}
