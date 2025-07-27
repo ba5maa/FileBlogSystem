@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentPage = "welcome"
   let currentPostSlug = null
   let currentAdminSection = "posts"
+  let base64Image = null;
 
   let CATEGORIES = []
   let TAGS = []
@@ -194,7 +195,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-async function fetchPublicPosts(limit = 3) {
+async function fetchPublicPosts(limit = 6) {
   try {
     const response = await fetch(`${API_BASE_URL}/api/posts?IsDraft=false&limit=${limit}`);
     if (!response.ok) {
@@ -408,7 +409,7 @@ async function loadPopularPosts() {
         <div class="post-image-container">
           ${
             post.imageUrl
-              ? `<img src="${API_BASE_URL}${post.imageUrl}" alt="${post.title}">`
+              ? `<img src="${API_BASE_URL}${post.imageUrl}?width=400&height=250&mode=crop" alt="${post.title}">`
               : `<div class="post-image-placeholder">
                   <i class="fas fa-image"></i>
                 </div>`
@@ -560,7 +561,7 @@ async function loadPopularPosts() {
             
             <div class="blog-post-meta">
               <div class="blog-post-author">
-                <img src="${post.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="author-avatar-large" alt="Author Avatar" />
+                <img src="${post.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}?width=400&height=250&mode=crop" class="author-avatar-large" alt="Author Avatar" />
                 <div class="author-info">
                   <span class="author-name">@${post.authorUsername}</span>
                   <span class="publish-date">${formatDate(post.publishedDate || post.creationDate)}</span>
@@ -1301,6 +1302,17 @@ async function loadPopularPosts() {
                         </div>
                     </div>
                 </div>
+
+               <div class="form-row" style="margin-top: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
+              <div class="form-group">
+                <label for="create-post-image">Image</label>
+                <input type="file" id="create-post-image" accept="image/*">
+                <img id="create-post-image-preview" src="#" alt="Preview" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px; display: none;">
+                <button type="button" class="btn btn-sm btn-danger" id="remove-create-image-btn" style="margin-top: 5px; display: none;">Remove Image</button>
+              </div>
+            </div>
+            
+            
             </div>
 
             <div id="schedule-modal" class="modal-overlay" style="display: none;">
@@ -1345,6 +1357,33 @@ async function loadPopularPosts() {
     const publishMenu = document.getElementById("publish-menu")
     const scheduleModal = document.getElementById("schedule-modal")
     const messageElement = document.getElementById("blog-message")
+    const createImageInput = document.getElementById("create-post-image");
+    const imagePreview = document.getElementById("create-post-image-preview");
+    const removeImageBtn = document.getElementById("remove-create-image-btn");
+    
+    
+    createImageInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        try {
+          base64Image = await readFileAsBase64(file);
+          imagePreview.src = base64Image;
+          imagePreview.style.display = "block";
+          removeImageBtn.style.display = "inline-block";
+        } catch (error) {
+          showMessage("Error reading image: " + error.message, "error", document.getElementById("blog-message"));
+        }
+      }
+    });
+    
+    removeImageBtn.addEventListener("click", () => {
+      createImageInput.value = "";
+      base64Image = null;
+      imagePreview.src = "#";
+      imagePreview.style.display = "none";
+      removeImageBtn.style.display = "none";
+    });
+
 
     backBtn.addEventListener("click", () => {
       navigateTo("/feed")
@@ -1548,7 +1587,7 @@ async function loadPopularPosts() {
       publishedDate: publishedDate,
       scheduledFor: status === "schedule" ? scheduledDate.toISOString() : null,
       ImageUrl: null,
-      Base64Image: null,
+      Base64Image: base64Image || null,
     }
 
     try {
@@ -1698,7 +1737,7 @@ async function loadPopularPosts() {
       <div class="post-image-container">
         ${
           post.imageUrl
-            ? `<img src="${API_BASE_URL}${post.imageUrl}" alt="${post.title}" class="post-image">`
+            ? `<img src="${API_BASE_URL}${post.imageUrl}?width=400&height=250&mode=crop" alt="${post.title}" class="post-image">`
             : '<div class="post-image-placeholder"><i class="fas fa-image"></i></div>'
         }
       </div>
@@ -2238,7 +2277,7 @@ async function loadPopularPosts() {
               <input type="file" id="edit-post-image" accept="image/*">
               ${
                 postData.imageUrl
-                  ? `<img src="${API_BASE_URL}${postData.imageUrl}" alt="${postData.title || "Current Image"}" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px;">
+                  ? `<img src="${API_BASE_URL}${postData.imageUrl}?width=400&height=250&mode=crop" alt="${postData.title || "Current Image"}" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px;">
                    <button type="button" class="btn btn-sm btn-danger remove-image-btn" style="margin-top: 5px;">Remove Image</button>`
                   : ""
               }

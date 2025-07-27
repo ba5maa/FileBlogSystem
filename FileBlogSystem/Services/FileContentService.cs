@@ -220,7 +220,7 @@ namespace FileBlogSystem.Services
                     var tag = await ReadJsonFileAsync<TagResponse>(filePath);
                     if (tag != null)
                     {
-                        if (tag.Id == Guid.Empty) // Check if ID was not deserialized
+                        if (tag.Id == Guid.Empty) 
                         {
                             var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
                             if (Guid.TryParse(fileNameWithoutExtension, out Guid fileId))

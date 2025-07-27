@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using FileBlogSystem.Endpoints;
 using System.Text;
 using Microsoft.OpenApi.Models;
+using SixLabors.ImageSharp.Web.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,7 @@ builder.Configuration.AddJsonFile("config/site.json", optional: false, reloadOnC
 builder.Services.Configure<SiteConfiguration>(builder.Configuration); 
 builder.Services.AddSingleton<IFileContentService, FileContentService>();
 builder.Services.AddEndpointsApiExplorer(); 
+builder.Services.AddImageSharp();
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -71,6 +73,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseImageSharp();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
