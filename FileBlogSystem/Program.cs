@@ -6,8 +6,6 @@ using FileBlogSystem.Endpoints;
 using System.Text;
 using Microsoft.OpenApi.Models;
 
-
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile("config/site.json", optional: false, reloadOnChange: true);
@@ -63,9 +61,7 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-
 builder.Services.AddAuthorization(); 
-
 
 var app = builder.Build();
 
@@ -74,7 +70,6 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
     app.UseSwagger();
     app.UseSwaggerUI();
- 
 }
 
 app.UseDefaultFiles();
@@ -86,10 +81,11 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/content"
 });
 
-
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapApiEndpoints();
+
+app.MapFallbackToFile("{*path:nonfile}", "index.html");
 
 app.Run();

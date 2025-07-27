@@ -10,10 +10,112 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let currentPage = "feed"
   let currentPostSlug = null
-  let currentAdminSection = "users"
+  let currentAdminSection = "posts"
 
   let CATEGORIES = []
   let TAGS = []
+
+  function initializeRouting() {
+    handleRouteChange()
+    
+    window.addEventListener('popstate', handleRouteChange)
+  }
+
+  function handleRouteChange() {
+    const path = window.location.pathname
+    const searchParams = new URLSearchParams(window.location.search)
+    
+    if (path === '/' || path === '/feed') {
+      currentPage = "feed"
+      currentPostSlug = null
+    } else if (path === '/login') {
+      currentPage = "login"
+      currentPostSlug = null
+    } else if (path === '/signup') {
+      currentPage = "signup"
+      currentPostSlug = null
+    } else if (path === '/drafts') {
+      currentPage = "drafts"
+      currentPostSlug = null
+    } else if (path === '/profile') {
+      currentPage = "profile"
+      currentPostSlug = null
+    } else if (path === '/admin') {
+      currentPage = "admin"
+      currentPostSlug = null
+      const section = searchParams.get('section')
+      if (section && ['users', 'categories', 'tags', 'posts'].includes(section)) {
+        currentAdminSection = section
+      }
+    } else if (path === '/create-blog') {
+      currentPage = "create-blog"
+      currentPostSlug = null
+    } else if (path.startsWith('/post/')) {
+      const slug = path.replace('/post/', '')
+      if (slug) {
+        currentPage = "blog-post"
+        currentPostSlug = slug
+      } else {
+        navigateTo('/feed')
+        return
+      }
+    } else {
+      navigateTo('/feed')
+      return
+    }
+    
+    renderAppContent()
+  }
+
+  function navigateTo(path, replace = false) {
+    if (replace) {
+      window.history.replaceState(null, '', path)
+    } else {
+      window.history.pushState(null, '', path)
+    }
+    handleRouteChange()
+  }
+
+  function updateURL() {
+    let newPath = '/'
+    
+    switch (currentPage) {
+      case 'feed':
+        newPath = '/feed'
+        break
+      case 'login':
+        newPath = '/login'
+        break
+      case 'signup':
+        newPath = '/signup'
+        break
+      case 'drafts':
+        newPath = '/drafts'
+        break
+      case 'profile':
+        newPath = '/profile'
+        break
+      case 'admin':
+        newPath = `/admin?section=${currentAdminSection}`
+        break
+      case 'create-blog':
+        newPath = '/create-blog'
+        break
+      case 'blog-post':
+        if (currentPostSlug) {
+          newPath = `/post/${currentPostSlug}`
+        } else {
+          newPath = '/feed'
+        }
+        break
+      default:
+        newPath = '/feed'
+    }
+    
+    if (window.location.pathname + window.location.search !== newPath) {
+      window.history.replaceState(null, '', newPath)
+    }
+  }
 
   function loadAuthData() {
     try {
@@ -55,7 +157,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!isAuthenticated()) {
       console.warn("Attempted authenticated fetch without valid token. Redirecting to login.")
       clearAuthData()
-      renderAuthForm("login")
+      navigateTo('/login')
       throw new Error("Authentication required.")
     }
 
@@ -76,7 +178,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           appContainer,
         )
         clearAuthData()
-        renderAuthForm("login")
+        navigateTo('/login')
         throw new Error(`Authorization error: ${response.status}`)
       }
       return response
@@ -118,10 +220,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function renderBlogPostPage(slug) {
+    // Update URL and page state
+    currentPage = "blog-post"
+    currentPostSlug = slug
+    updateURL()
+
     appContainer.innerHTML = `
       <div class="blog-post-page">
         <div class="blog-post-header">
-          <button class="back-btn" id="back-to-drafts">
+          <button class="back-btn" id="back-to-feed">
             <i class="fas fa-arrow-left"></i>
             Back to Feed
           </button>
@@ -160,10 +267,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       </div>
     `
 
-    document.getElementById("back-to-drafts").addEventListener("click", () => {
-      currentPage = "feed"
-      currentPostSlug = null
-      renderAppContent()
+    document.getElementById("back-to-feed").addEventListener("click", () => {
+      navigateTo('/feed')
     })
 
     try {
@@ -187,6 +292,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const blogMain = document.querySelector(".blog-post-main")
       const isLikedByCurrentUser = post.likedByUsers?.includes(user?.username)
       const likeCount = post.likedByUsers?.length || 0
+
+      // Update page title with post title
+      document.title = `${post.title} - FileBlogSystem`
 
       blogMain.innerHTML = `
         <article class="blog-post-article">
@@ -279,8 +387,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="error-state">
           <i class="fas fa-exclamation-triangle"></i>
           <p>Error loading blog post: ${error.message}</p>
+          <button class="btn btn-primary" onclick="navigateTo('/feed')">
+            <i class="fas fa-home"></i>
+            Go to Feed
+          </button>
         </div>
       `
+      document.title = "FileBlogSystem"
     }
   }
 
@@ -459,6 +572,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function renderAuthForm(type = "login") {
+    currentPage = type
+    updateURL()
+    
+    document.title = type === "login" ? "Login - FileBlogSystem" : "Sign Up - FileBlogSystem"
+
     appContainer.innerHTML = `
             <div class="auth-container">
                 <div class="auth-card">
@@ -522,23 +640,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (switchLink) {
         switchLink.onclick = (e) => {
           e.preventDefault()
-          currentType = currentType === "login" ? "signup" : "login"
-
-          if (currentType === "signup") {
-            signupFields.style.display = "block"
-            authTitle.textContent = "Create Account"
-            authSubtitle.textContent = ""
-            submitText.textContent = "Create Account"
-            authSwitchTextContainer.innerHTML = 'Already have an account? <a href="#" id="auth-switch-link">Sign In</a>'
-          } else {
-            signupFields.style.display = "none"
-            authTitle.textContent = "Welcome Back"
-            authSubtitle.textContent = "Sign in to your account"
-            submitText.textContent = "Sign In"
-            authSwitchTextContainer.innerHTML = 'Don\'t have an account? <a href="#" id="auth-switch-link">Sign Up</a>'
-          }
-          setupSwitchLink()
-          messageElement.style.display = "none"
+          const newType = currentType === "login" ? "signup" : "login"
+          navigateTo(`/${newType}`)
         }
       }
     }
@@ -690,7 +793,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           token = data.token
           tokenExpires = new Date(data.expires)
           saveAuthData()
-          renderAppContent()
+          navigateTo('/feed')
         } else {
           try {
             const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
@@ -711,7 +814,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               token = loginData.token
               tokenExpires = new Date(loginData.expires)
               saveAuthData()
-              renderAppContent()
+              navigateTo('/feed')
             } else {
               throw new Error("Auto-login failed")
             }
@@ -719,15 +822,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             console.error("Auto-login error:", error)
             showMessage("Account created successfully! Please sign in.", "success", messageElement)
             setTimeout(() => {
-              currentType = "login"
-              signupFields.style.display = "none"
-              authTitle.textContent = "Welcome Back"
-              authSubtitle.textContent = "Sign in to your account"
-              submitText.textContent = "Sign In"
-              authSwitchTextContainer.innerHTML =
-                'Don\'t have an account? <a href="#" id="auth-switch-link">Sign Up</a>'
-              setupSwitchLink()
-              messageElement.style.display = "none"
+              navigateTo('/login')
             }, 2000)
           }
         }
@@ -738,6 +833,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function renderDashboard() {
+    currentPage = "feed"
+    updateURL()
+
+    document.title = "Feed - FileBlogSystem"
+
     appContainer.innerHTML = `
             <div class="dashboard">
                 <div class="search-section">
@@ -789,8 +889,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         `
 
     document.getElementById("create-blog-btn").addEventListener("click", () => {
-      currentPage = "create-blog"
-      renderCreateBlogPage()
+      navigateTo('/create-blog')
     })
 
     setupSearchAndFilter()
@@ -798,11 +897,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function renderCreateBlogPage() {
+    currentPage = "create-blog"
+    updateURL()
+    
+    document.title = "Create Blog - FileBlogSystem"
+
     appContainer.innerHTML = `
         <div class="create-blog-page">
             <div class="blog-editor-header">
                 <div class="header-left">
-                    <button class="back-btn" id="back-to-drafts">
+                    <button class="back-btn" id="back-to-feed">
                         <i class="fas fa-arrow-left"></i>
                         Back to Feed
                     </button>
@@ -964,7 +1068,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
   }
 
   function setupBlogEditor() {
-    const backBtn = document.getElementById("back-to-drafts")
+    const backBtn = document.getElementById("back-to-feed")
     const markdownEditor = document.getElementById("markdown-editor")
     const markdownPreview = document.getElementById("markdown-preview")
     const writeTab = document.getElementById("write-tab")
@@ -977,8 +1081,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
     const messageElement = document.getElementById("blog-message")
 
     backBtn.addEventListener("click", () => {
-      currentPage = "feed"
-      renderAppContent()
+      navigateTo('/feed')
     })
 
     writeTab.addEventListener("click", () => {
@@ -1209,8 +1312,11 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       showMessage(successMessage, "success", messageElement)
 
       setTimeout(() => {
-        currentPage = status === "draft" ? "drafts" : "feed"
-        renderAppContent()
+        if (status === "draft") {
+          navigateTo('/drafts')
+        } else {
+          navigateTo('/feed')
+        }
       }, 2000)
     } catch (error) {
       console.error("Publish blog error:", error)
@@ -1451,9 +1557,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
         const postTitle = postCard.querySelector(".post-card-title")
         postTitle.addEventListener("click", (e) => {
           const postSlug = postTitle.dataset.postSlug
-          currentPage = "blog-post"
-          currentPostSlug = postSlug
-          renderBlogPostPage(postSlug)
+          navigateTo(`/post/${postSlug}`)
         })
 
         fetchCommentsForPost(post.slug).then((comments) => {
@@ -1542,9 +1646,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       button.addEventListener("click", (e) => {
         e.preventDefault()
         const postSlug = button.dataset.postSlug
-        currentPage = "blog-post"
-        currentPostSlug = postSlug
-        renderBlogPostPage(postSlug)
+        navigateTo(`/post/${postSlug}`)
       })
     })
 
@@ -1555,9 +1657,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
         contentArea.addEventListener("click", (e) => {
           e.preventDefault()
           const post = JSON.parse(card.dataset.post)
-          currentPage = "blog-post"
-          currentPostSlug = post.slug
-          renderBlogPostPage(post.slug)
+          navigateTo(`/post/${post.slug}`)
         })
       }
       const imageArea = card.querySelector(".post-image, .post-image-placeholder")
@@ -1566,9 +1666,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
         imageArea.addEventListener("click", (e) => {
           e.preventDefault()
           const post = JSON.parse(card.dataset.post)
-          currentPage = "blog-post"
-          currentPostSlug = post.slug
-          renderBlogPostPage(post.slug)
+          navigateTo(`/post/${post.slug}`)
         })
       }
     })
@@ -1577,9 +1675,16 @@ You can insert images anywhere by clicking the image button in the toolbar or us
   function renderDraftsPage() {
     if (!isAuthenticated()) {
       showMessage("You must be logged in to view your drafts.", "error", appContainer)
-      renderAuthForm("login")
+      navigateTo('/login')
       return
     }
+
+    // Update URL and page state
+    currentPage = "drafts"
+    updateURL()
+    
+    // Update page title
+    document.title = "My Drafts & Posts - FileBlogSystem"
 
     appContainer.innerHTML = `
       <div class="drafts-page">
@@ -1633,7 +1738,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
             <i class="fas fa-file-alt"></i>
             <h3>No drafts yet</h3>
             <p>Your draft posts will appear here</p>
-            <button class="btn btn-primary" onclick="currentPage = 'create-blog'; renderCreateBlogPage();">
+            <button class="btn btn-primary" onclick="navigateTo('/create-blog')">
               <i class="fas fa-plus"></i> Create New Blog
             </button>
           </div>
@@ -1741,6 +1846,9 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       publishedDateValue = dateObj.toISOString().split("T")[0]
       publishedTimeValue = dateObj.toTimeString().substring(0, 5)
     }
+
+    // Update page title
+    document.title = `Edit: ${postData.title} - FileBlogSystem`
 
     appContainer.innerHTML = `
       <div class="create-blog-page">
@@ -1924,8 +2032,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
     let imageRemoved = false
 
     backBtn.addEventListener("click", () => {
-      currentPage = "drafts"
-      renderAppContent()
+      navigateTo('/drafts')
     })
 
     writeTab.addEventListener("click", () => {
@@ -2101,8 +2208,11 @@ You can insert images anywhere by clicking the image button in the toolbar or us
 
         showMessage("Post updated successfully!", "success", messageElement)
         setTimeout(() => {
-          currentPage = updatedPost.isDraft ? "drafts" : "feed"
-          renderAppContent()
+          if (updatedPost.isDraft) {
+            navigateTo('/drafts')
+          } else {
+            navigateTo('/feed')
+          }
         }, 1500)
       } catch (error) {
         console.error("Update post error:", error)
@@ -2308,9 +2418,14 @@ You can insert images anywhere by clicking the image button in the toolbar or us
   function renderProfilePage() {
     if (!isAuthenticated()) {
       showMessage("You must be logged in to view your profile.", "error", appContainer)
-      renderAuthForm("login")
+      navigateTo('/login')
       return
     }
+
+    currentPage = "profile"
+    updateURL()
+    
+    document.title = "Profile - FileBlogSystem"
 
     appContainer.innerHTML = `
       <div class="profile-page">
@@ -2361,8 +2476,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       btn.addEventListener("click", (e) => {
         if (btn.id === "profile-logout") {
           clearAuthData()
-          currentPage = "feed"
-          renderAppContent()
+          navigateTo('/feed')
           return
         }
 
@@ -2403,7 +2517,6 @@ You can insert images anywhere by clicking the image button in the toolbar or us
           <div class="form-group">
             <label for="edit-username">Username</label>
             <input type="text" id="edit-username" value="${user.username}" required readonly>
-            <small class="form-text">Username cannot be changed</small>
           </div>
           
           <div class="form-group">
@@ -2459,8 +2572,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
           showMessage("Account deleted successfully!", "success", messageElement)
           setTimeout(() => {
             clearAuthData()
-            currentPage = "feed"
-            renderAppContent()
+            navigateTo('/feed')
           }, 1500)
         } catch (error) {
           showMessage(error.message, "error", messageElement)
@@ -2633,14 +2745,17 @@ You can insert images anywhere by clicking the image button in the toolbar or us
             `
 
       document.getElementById("profile-btn").addEventListener("click", () => {
-        currentPage = "profile"
-        renderAppContent()
+        navigateTo('/profile')
       })
 
       document.querySelectorAll(".nav-btn[data-page]").forEach((btn) => {
         btn.addEventListener("click", () => {
-          currentPage = btn.dataset.page
-          renderAppContent()
+          const page = btn.dataset.page
+          if (page === 'admin') {
+            navigateTo(`/admin?section=${currentAdminSection}`)
+          } else {
+            navigateTo(`/${page}`)
+          }
         })
       })
     } else {
@@ -2653,12 +2768,10 @@ You can insert images anywhere by clicking the image button in the toolbar or us
                     </button>
                 `
       document.getElementById("nav-login").addEventListener("click", () => {
-        currentPage = "login"
-        renderAuthForm("login")
+        navigateTo('/login')
       })
       document.getElementById("nav-signup").addEventListener("click", () => {
-        currentPage = "signup"
-        renderAuthForm("signup")
+        navigateTo('/signup')
       })
     }
   }
@@ -2666,10 +2779,14 @@ You can insert images anywhere by clicking the image button in the toolbar or us
   async function renderAdminPage() {
     if (!isAuthenticated() || !user.roles.includes("Admin")) {
       showMessage("You must be an admin to access this page.", "error", appContainer)
-      currentPage = "feed"
-      renderAppContent()
+      navigateTo('/feed')
       return
     }
+
+    currentPage = "admin"
+    updateURL()
+    
+    document.title = "Admin Panel - FileBlogSystem"
 
     appContainer.innerHTML = `
     <div class="admin-page">
@@ -2680,6 +2797,9 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       
       <div class="admin-navigation">
         <div class="admin-nav-buttons">
+          <button class="admin-nav-btn ${currentAdminSection === "posts" ? "active" : ""}" data-section="posts">
+              <i class="fas fa-file-alt"></i> Blogs Management
+            </button>
           <button class="admin-nav-btn ${currentAdminSection === "users" ? "active" : ""}" data-section="users">
             <i class="fas fa-users"></i> User Management
           </button>
@@ -2688,9 +2808,6 @@ You can insert images anywhere by clicking the image button in the toolbar or us
           </button>
           <button class="admin-nav-btn ${currentAdminSection === "tags" ? "active" : ""}" data-section="tags">
             <i class="fas fa-tags"></i> Tags Management
-          </button>
-          <button class="admin-nav-btn ${currentAdminSection === "posts" ? "active" : ""}" data-section="posts">
-            <i class="fas fa-file-alt"></i> Posts Management
           </button>
         </div>
       </div>
@@ -2709,6 +2826,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
         currentAdminSection = btn.dataset.section
         document.querySelectorAll(".admin-nav-btn").forEach((b) => b.classList.remove("active"))
         btn.classList.add("active")
+        navigateTo(`/admin?section=${currentAdminSection}`, true)
         loadAdminSection(currentAdminSection)
       })
     })
@@ -3058,9 +3176,9 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       adminContent.innerHTML = `
         <div class="admin-section">
           <div class="section-header">
-            <h3><i class="fas fa-file-alt"></i> Posts Management</h3>
+            <h3><i class="fas fa-file-alt"></i> Blogs Management</h3>
             <div class="section-stats">
-              <span>${posts.length} posts</span>
+              <span>${posts.length} blogs</span>
             </div>
           </div>
           <div id="posts-container" class="admin-container">
@@ -3103,9 +3221,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
         postsContainer.querySelectorAll(".view-post-btn").forEach((btn) => {
           btn.addEventListener("click", (e) => {
             const postSlug = e.target.dataset.postSlug
-            currentPage = "blog-post"
-            currentPostSlug = postSlug
-            renderBlogPostPage(postSlug)
+            navigateTo(`/post/${postSlug}`)
           })
         })
 
@@ -3307,9 +3423,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       if (!userResponse.ok) throw new Error("Failed to fetch user data")
 
       const userData = await userResponse.json()
-      const newRoles = makeAdmin
-        ? [...new Set([...userData.roles, "Admin"])]
-        : userData.roles.filter((role) => role !== "Admin")
+      const newRoles = makeAdmin ? ["Author", "Admin"] : ["Author"]
 
       const response = await fetchAuthenticated(`${API_BASE_URL}/api/update-user/${username}`, {
         method: "PUT",
@@ -3325,7 +3439,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       }
 
       showMessage(
-        `User ${username} ${makeAdmin ? "promoted to" : "removed from"} admin successfully!`,
+        `User ${username} ${makeAdmin ? "promoted to admin" : "admin privileges removed"} successfully!`,
         "success",
         appContainer,
       )
@@ -3351,9 +3465,9 @@ You can insert images anywhere by clicking the image button in the toolbar or us
     }
   }
 
-  async function deleteCategory(categoryId) {
+  async function deleteCategory(id) {
     try {
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-category/${categoryId}`, {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-category/${id}`, {
         method: "DELETE",
       })
 
@@ -3363,15 +3477,15 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       }
 
       showMessage("Category deleted successfully!", "success", appContainer)
-      fetchCategoriesAndTags()
+      await fetchCategoriesAndTags()
     } catch (error) {
       showMessage(error.message, "error", appContainer)
     }
   }
 
-  async function deleteTag(tagId) {
+  async function deleteTag(id) {
     try {
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-tag/${tagId}`, {
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/delete-tag/${id}`, {
         method: "DELETE",
       })
 
@@ -3381,7 +3495,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       }
 
       showMessage("Tag deleted successfully!", "success", appContainer)
-      fetchCategoriesAndTags()
+      await fetchCategoriesAndTags()
     } catch (error) {
       showMessage(error.message, "error", appContainer)
     }
@@ -3390,22 +3504,30 @@ You can insert images anywhere by clicking the image button in the toolbar or us
   async function renderAppContent() {
     updateNav()
 
-    if (currentPage === "blog-post" && currentPostSlug) {
-      await renderBlogPostPage(currentPostSlug)
-      return
-    }
-
     if (!isAuthenticated() && currentPage !== "login" && currentPage !== "signup") {
       renderAuthForm("login")
       return
     }
 
     switch (currentPage) {
+      case "login":
+        renderAuthForm("login")
+        break
+      case "signup":
+        renderAuthForm("signup")
+        break
       case "feed":
         await renderDashboard()
         break
       case "create-blog":
         renderCreateBlogPage()
+        break
+      case "blog-post":
+        if (currentPostSlug) {
+          await renderBlogPostPage(currentPostSlug)
+        } else {
+          navigateTo('/feed')
+        }
         break
       case "drafts":
         renderDraftsPage()
@@ -3416,23 +3538,14 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       case "admin":
         await renderAdminPage()
         break
-      case "login":
-        renderAuthForm("login")
-        break
-      case "signup":
-        renderAuthForm("signup")
-        break
       default:
         await renderDashboard()
     }
   }
 
   loadAuthData()
-
-  if (isAuthenticated()) {
-    await fetchCategoriesAndTags()
-    renderAppContent()
-  } else {
-    renderAuthForm("login")
-  }
+  await fetchCategoriesAndTags()
+  initializeRouting()
+  
+  window.navigateTo = navigateTo
 })
