@@ -86,7 +86,7 @@ namespace FileBlogSystem.Endpoints
                 }
                 return Results.Ok(posts);
             })
-            .RequireAuthorization()
+            //.RequireAuthorization()
             .WithName(EndpointConstants.GetAllPosts)
             .Produces<List<BlogPostMetaResponse>>(StatusCodes.Status200OK);
 
@@ -123,7 +123,7 @@ namespace FileBlogSystem.Endpoints
                     LikeCount = postMeta.LikedByUsers?.Count ?? 0
                 });
             })
-            .RequireAuthorization()
+            //.RequireAuthorization()
             .WithName(EndpointConstants.GetPostBySlug)
             .Produces<object>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound)
@@ -134,7 +134,7 @@ namespace FileBlogSystem.Endpoints
                 var categories = await contentService.GetAllCategoriesAsync();
                 return Results.Ok(categories);
             })
-            .RequireAuthorization()
+            //.RequireAuthorization()
             .WithName(EndpointConstants.GetAllCategories)
             .Produces<List<CategoryResponse>>(StatusCodes.Status200OK);
 
@@ -147,7 +147,7 @@ namespace FileBlogSystem.Endpoints
                 }
                 return Results.Ok(category);
             })
-            .RequireAuthorization()
+            //.RequireAuthorization()
             .WithName(EndpointConstants.GetCategoryById)
             .WithOpenApi();
 
@@ -156,7 +156,7 @@ namespace FileBlogSystem.Endpoints
                 var tags = await contentService.GetAllTagsAsync();
                 return Results.Ok(tags);
             })
-            .RequireAuthorization()
+            //.RequireAuthorization()
             .WithName(EndpointConstants.GetAllTags)
             .Produces<List<TagResponse>>(StatusCodes.Status200OK);
 
@@ -169,7 +169,7 @@ namespace FileBlogSystem.Endpoints
                 }
                 return Results.Ok(tag);
             })
-            .RequireAuthorization()
+            //.RequireAuthorization()
             .WithName(EndpointConstants.GetTagById)
             .WithOpenApi();
 
@@ -182,7 +182,7 @@ namespace FileBlogSystem.Endpoints
                 }
                 return Results.Ok(user);
             })
-            .RequireAuthorization()
+            //.RequireAuthorization()
             .WithName(EndpointConstants.GetUserByUsername)
             .Produces<UserResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
@@ -498,7 +498,7 @@ namespace FileBlogSystem.Endpoints
                 var users = await contentService.GetAllUsersAsync();
                 return Results.Ok(users);
             })
-            .RequireAuthorization()
+            //.RequireAuthorization()
             .WithName(EndpointConstants.GetAllUsers)
             .WithOpenApi();
 

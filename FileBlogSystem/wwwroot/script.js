@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let token = null
   let tokenExpires = null
 
-  let currentPage = "feed"
+  let currentPage = "welcome"
   let currentPostSlug = null
   let currentAdminSection = "posts"
 
@@ -17,103 +17,109 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function initializeRouting() {
     handleRouteChange()
-    
-    window.addEventListener('popstate', handleRouteChange)
+
+    window.addEventListener("popstate", handleRouteChange)
   }
 
   function handleRouteChange() {
     const path = window.location.pathname
     const searchParams = new URLSearchParams(window.location.search)
-    
-    if (path === '/' || path === '/feed') {
+
+    if (path === "/" || path === "/welcome") {
+      currentPage = "welcome"
+      currentPostSlug = null
+    } else if (path === "/feed") {
       currentPage = "feed"
       currentPostSlug = null
-    } else if (path === '/login') {
+    } else if (path === "/login") {
       currentPage = "login"
       currentPostSlug = null
-    } else if (path === '/signup') {
+    } else if (path === "/signup") {
       currentPage = "signup"
       currentPostSlug = null
-    } else if (path === '/drafts') {
+    } else if (path === "/drafts") {
       currentPage = "drafts"
       currentPostSlug = null
-    } else if (path === '/profile') {
+    } else if (path === "/profile") {
       currentPage = "profile"
       currentPostSlug = null
-    } else if (path === '/admin') {
+    } else if (path === "/admin") {
       currentPage = "admin"
       currentPostSlug = null
-      const section = searchParams.get('section')
-      if (section && ['users', 'categories', 'tags', 'posts'].includes(section)) {
+      const section = searchParams.get("section")
+      if (section && ["users", "categories", "tags", "posts"].includes(section)) {
         currentAdminSection = section
       }
-    } else if (path === '/create-blog') {
+    } else if (path === "/create-blog") {
       currentPage = "create-blog"
       currentPostSlug = null
-    } else if (path.startsWith('/post/')) {
-      const slug = path.replace('/post/', '')
+    } else if (path.startsWith("/post/")) {
+      const slug = path.replace("/post/", "")
       if (slug) {
         currentPage = "blog-post"
         currentPostSlug = slug
       } else {
-        navigateTo('/feed')
+        navigateTo("/welcome")
         return
       }
     } else {
-      navigateTo('/feed')
+      navigateTo("/welcome")
       return
     }
-    
+
     renderAppContent()
   }
 
   function navigateTo(path, replace = false) {
     if (replace) {
-      window.history.replaceState(null, '', path)
+      window.history.replaceState(null, "", path)
     } else {
-      window.history.pushState(null, '', path)
+      window.history.pushState(null, "", path)
     }
     handleRouteChange()
   }
 
   function updateURL() {
-    let newPath = '/'
-    
+    let newPath = "/"
+
     switch (currentPage) {
-      case 'feed':
-        newPath = '/feed'
+      case "welcome":
+        newPath = "/welcome"
         break
-      case 'login':
-        newPath = '/login'
+      case "feed":
+        newPath = "/feed"
         break
-      case 'signup':
-        newPath = '/signup'
+      case "login":
+        newPath = "/login"
         break
-      case 'drafts':
-        newPath = '/drafts'
+      case "signup":
+        newPath = "/signup"
         break
-      case 'profile':
-        newPath = '/profile'
+      case "drafts":
+        newPath = "/drafts"
         break
-      case 'admin':
+      case "profile":
+        newPath = "/profile"
+        break
+      case "admin":
         newPath = `/admin?section=${currentAdminSection}`
         break
-      case 'create-blog':
-        newPath = '/create-blog'
+      case "create-blog":
+        newPath = "/create-blog"
         break
-      case 'blog-post':
+      case "blog-post":
         if (currentPostSlug) {
           newPath = `/post/${currentPostSlug}`
         } else {
-          newPath = '/feed'
+          newPath = "/welcome"
         }
         break
       default:
-        newPath = '/feed'
+        newPath = "/welcome"
     }
-    
+
     if (window.location.pathname + window.location.search !== newPath) {
-      window.history.replaceState(null, '', newPath)
+      window.history.replaceState(null, "", newPath)
     }
   }
 
@@ -157,7 +163,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!isAuthenticated()) {
       console.warn("Attempted authenticated fetch without valid token. Redirecting to login.")
       clearAuthData()
-      navigateTo('/login')
+      navigateTo("/login")
       throw new Error("Authentication required.")
     }
 
@@ -178,7 +184,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           appContainer,
         )
         clearAuthData()
-        navigateTo('/login')
+        navigateTo("/login")
         throw new Error(`Authorization error: ${response.status}`)
       }
       return response
@@ -188,39 +194,291 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  function convertMarkdownToHtml(markdownText) {
-    if (!markdownText) return ""
-
-    let html = markdownText
-      .replace(/^### (.*$)/gim, "<h3>$1</h3>")
-      .replace(/^## (.*$)/gim, "<h2>$1</h2>")
-      .replace(/^# (.*$)/gim, "<h1>$1</h1>")
-      .replace(/\*\*(.*?)\*\*/gim, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/gim, "<em>$1</em>")
-      .replace(/!\[([^\]]*)\]$$([^)]*)$$/gim, '<img src="$2" alt="$1" class="preview-image">')
-      .replace(/\[([^\]]*)\]$$([^)]*)$$/gim, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-      .replace(/^> (.*$)/gim, "<blockquote>$1</blockquote>")
-      .replace(/^- (.*$)/gim, "<li>$1</li>")
-      .replace(/(<li>.*<\/li>)/s, "<ul>$1</ul>")
-      .replace(/```([^`]*)```/gim, "<pre><code>$1</code></pre>")
-      .replace(/`([^`]*)`/gim, "<code>$1</code>")
-      .replace(/\n\n/gim, "</p><p>")
-      .replace(/\n/gim, "<br>")
-
-    if (
-      !html.startsWith("<h") &&
-      !html.startsWith("<p>") &&
-      !html.startsWith("<ul>") &&
-      !html.startsWith("<blockquote>")
-    ) {
-      html = "<p>" + html + "</p>"
+async function fetchPublicPosts(limit = 3) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/posts?IsDraft=false&limit=${limit}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch posts");
     }
+    const posts = await response.json();
 
-    return html
+    const sortedPosts = posts
+      .sort((a, b) => {
+        const aLikes = a.likedByUsers?.length || 0;
+        const bLikes = b.likedByUsers?.length || 0;
+        return bLikes - aLikes;
+      })
+      .slice(0, limit);
+
+    return sortedPosts;
+  } catch (error) {
+    console.error("Error fetching public posts:", error);
+    return [];
+  }
+}
+
+
+function convertMarkdownToHtml(markdownText) {
+  if (!markdownText) return "";
+
+  let html = markdownText
+    .replace(/^### (.*$)/gim, "<h3>$1</h3>")
+    .replace(/^## (.*$)/gim, "<h2>$1</h2>")
+    .replace(/^# (.*$)/gim, "<h1>$1</h1>")
+    .replace(/\*\*(.*?)\*\*/gim, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/gim, "<em>$1</em>")
+    .replace(/!\[([^\]]*)\]\(([^)]*)\)/gim, '<img src="$2" alt="$1" class="preview-image">')
+    .replace(/\[([^\]]*)\]\(([^)]*)\)/gim, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/^> (.*$)/gim, "<blockquote>$1</blockquote>")
+    .replace(/^- (.*$)/gim, "<li>$1</li>");
+
+  if (html.includes("<li>")) {
+    html = html.replace(/(<li>.*<\/li>)/s, "<ul>$1</ul>");
   }
 
+  html = html
+    .replace(/```([^`\n]*)?\n([\s\S]*?)\n```/gim, "<pre><code>$2</code></pre>")
+    .replace(/`([^`]*)`/gim, "<code>$1</code>"); 
+
+  html = html
+    .replace(/\n\n/gim, "</p><p>")
+    .replace(/\n/gim, "<br>");
+
+  if (
+    !html.startsWith("<h") &&
+    !html.startsWith("<p>") &&
+    !html.startsWith("<ul>") &&
+    !html.startsWith("<blockquote>") &&
+    !html.startsWith("<pre>")
+  ) {
+    html = "<p>" + html + "</p>";
+  }
+
+  return html;
+}
+
+async function renderWelcomePage() {
+  currentPage = "welcome";
+  updateURL();
+
+  document.title = "Welcome to FileBlogSystem - Discover Amazing Stories";
+
+  appContainer.innerHTML = `
+    <div class="welcome-page">
+      <div class="welcome-hero">
+        <div>
+          <h1>
+            Welcome to FileBlogSystem
+          </h1>
+          <p>
+            Discover amazing stories, share your thoughts, and connect with a community of passionate writers and readers.
+          </p>
+          <div class="welcome-cta-buttons">
+            <button class="welcome-cta-btn" id="welcome-signup-btn">
+              <i class="fas fa-user-plus"></i>
+              Start Your Journey
+            </button>
+            <button class="welcome-cta-btn" id="welcome-login-btn">
+              <i class="fas fa-sign-in-alt"></i>
+              Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="welcome-features">
+        <div class="feature-card">
+          <div>
+            <i class="fas fa-pen-fancy"></i>
+          </div>
+          <h3>Write & Share</h3>
+          <p>Express your thoughts and share your stories with our intuitive writing tools and markdown support.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div>
+            <i class="fas fa-users"></i>
+          </div>
+          <h3>Connect</h3>
+          <p>Join a vibrant community of writers and readers. Like, comment, and engage with amazing content.</p>
+        </div>
+        
+        <div class="feature-card">
+          <div>
+            <i class="fas fa-heart"></i>
+          </div>
+          <h3>Discover</h3>
+          <p>Explore trending topics, discover new authors, and find content that inspires and educates.</p>
+        </div>
+      </div>
+
+      <div class="popular-posts-section">
+        <div class="section-header">
+          <h2>
+            <i class="fas fa-fire"></i>
+            Most Loved Stories
+          </h2>
+          <p>
+            Discover the most popular and engaging blog posts from our amazing community of writers.
+          </p>
+        </div>
+        
+        <div id="popular-posts-container">
+          <div class="loading-posts">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading amazing stories...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="welcome-cta-section">
+        <h2>
+          Ready to Share Your Story?
+        </h2>
+        <p>
+          Join thousands of writers and readers in our growing community.
+        </p>
+        <div class="welcome-cta-buttons">
+          <button class="welcome-cta-btn" id="welcome-signup-btn-2">
+            <i class="fas fa-rocket"></i>
+            Get Started Free
+          </button>
+          <button class="welcome-cta-btn" id="welcome-explore-btn">
+            <i class="fas fa-compass"></i>
+            Explore More
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("welcome-signup-btn").addEventListener("click", () => {
+    navigateTo("/signup");
+  });
+
+  document.getElementById("welcome-login-btn").addEventListener("click", () => {
+    navigateTo("/login");
+  });
+
+  document.getElementById("welcome-signup-btn-2").addEventListener("click", () => {
+    navigateTo("/signup");
+  });
+
+  document.getElementById("welcome-explore-btn").addEventListener("click", () => {
+    document.querySelector(".popular-posts-section").scrollIntoView({
+      behavior: "smooth",
+    });
+  });
+
+  loadPopularPosts();
+}
+
+async function loadPopularPosts() {
+  const container = document.getElementById("popular-posts-container");
+
+  try {
+    const posts = await fetchPublicPosts(6);
+
+    container.innerHTML = "";
+
+    if (posts.length === 0) {
+      container.innerHTML = `
+        <div class="no-posts-message">
+          <i class="fas fa-book-open"></i>
+          <h3>No posts available yet</h3>
+          <p>Be the first to share your amazing story!</p>
+        </div>
+      `;
+      return;
+    }
+
+    posts.forEach((post, index) => {
+      const likeCount = post.likedByUsers?.length || 0;
+      const rankBadge = `#${index + 1}`;
+      const markdownPreview = convertMarkdownToHtml(post.content.substring(0, 150));
+
+      const postCard = document.createElement("div");
+      postCard.className = "popular-post-card";
+      
+      postCard.innerHTML = `
+        <div class="rank-badge">
+          ${rankBadge} Most Loved
+        </div>
+        
+        <div class="post-image-container">
+          ${
+            post.imageUrl
+              ? `<img src="${API_BASE_URL}${post.imageUrl}" alt="${post.title}">`
+              : `<div class="post-image-placeholder">
+                  <i class="fas fa-image"></i>
+                </div>`
+          }
+        </div>
+        
+        <div class="post-content">
+          <div>
+            <div class="post-category">
+              <i class="fas fa-folder"></i>
+              ${Array.isArray(post.categories) ? post.categories.map(getCategoryNameById).join(", ") : "Uncategorized"}
+            </div>
+            
+            <h3>${post.title}</h3>
+            
+            <div class="post-preview-text">${markdownPreview}${post.content.length > 150 ? "..." : ""}</div>
+          </div>
+          
+          <div class="post-footer">
+            <div class="author-info">
+              <img src="/placeholder.svg?height=32&width=32" alt="Author Avatar" />
+              <div>
+                <div class="author-username">@${post.authorUsername}</div>
+                <div class="post-date">${formatDate(post.publishedDate || post.creationDate)}</div>
+              </div>
+            </div>
+            
+            <div class="post-actions">
+              <div class="like-count">
+                <i class="fas fa-heart"></i>
+                <span>${likeCount}</span>
+              </div>
+              <div class="read-more-btn">
+                <i class="fas fa-eye"></i>
+                Read More
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      postCard.addEventListener("click", () => {
+        if (isAuthenticated()) {
+          navigateTo(`/post/${post.slug}`);
+        } else {
+          if (confirm("Please sign in to read the full article. Would you like to sign in now?")) {
+            navigateTo("/login");
+          }
+        }
+      });
+
+      container.appendChild(postCard);
+    });
+  } catch (error) {
+    console.error("Error loading popular posts:", error);
+    container.innerHTML = `
+      <div class="error-message">
+        <i class="fas fa-exclamation-triangle"></i>
+        <h3>Error loading posts</h3>
+        <p>Please try again later.</p>
+      </div>
+    `;
+  }
+}
   async function renderBlogPostPage(slug) {
-    // Update URL and page state
+    if (!isAuthenticated()) {
+      navigateTo("/welcome")
+      return
+    }
+
     currentPage = "blog-post"
     currentPostSlug = slug
     updateURL()
@@ -268,7 +526,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     `
 
     document.getElementById("back-to-feed").addEventListener("click", () => {
-      navigateTo('/feed')
+      navigateTo("/feed")
     })
 
     try {
@@ -293,7 +551,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isLikedByCurrentUser = post.likedByUsers?.includes(user?.username)
       const likeCount = post.likedByUsers?.length || 0
 
-      // Update page title with post title
       document.title = `${post.title} - FileBlogSystem`
 
       blogMain.innerHTML = `
@@ -387,9 +644,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="error-state">
           <i class="fas fa-exclamation-triangle"></i>
           <p>Error loading blog post: ${error.message}</p>
-          <button class="btn btn-primary" onclick="navigateTo('/feed')">
+          <button class="btn btn-primary" onclick="navigateTo('/welcome')">
             <i class="fas fa-home"></i>
-            Go to Feed
+            Go to Welcome
           </button>
         </div>
       `
@@ -445,7 +702,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const newComment = await addCommentToPost(slug, commentInput.value.trim())
             if (newComment) {
               commentInput.value = ""
-              loadCommentsInSidebar(slug) 
+              loadCommentsInSidebar(slug)
             }
           } catch (error) {
             console.error("Error adding comment:", error)
@@ -544,10 +801,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function fetchCategoriesAndTags() {
     try {
-      const [categoriesRes, tagsRes] = await Promise.all([
-        fetchAuthenticated(`${API_BASE_URL}/api/categories`),
-        fetchAuthenticated(`${API_BASE_URL}/api/tags`),
-      ])
+      let categoriesRes, tagsRes
+
+      try {
+        categoriesRes = await fetch(`${API_BASE_URL}/api/categories`)
+        tagsRes = await fetch(`${API_BASE_URL}/api/tags`)
+      } catch (error) {
+        if (isAuthenticated()) {
+          categoriesRes = await fetchAuthenticated(`${API_BASE_URL}/api/categories`)
+          tagsRes = await fetchAuthenticated(`${API_BASE_URL}/api/tags`)
+        } else {
+          throw error
+        }
+      }
 
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json()
@@ -574,7 +840,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderAuthForm(type = "login") {
     currentPage = type
     updateURL()
-    
+
     document.title = type === "login" ? "Login - FileBlogSystem" : "Sign Up - FileBlogSystem"
 
     appContainer.innerHTML = `
@@ -633,7 +899,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const submitText = document.getElementById("submit-text")
     const authSwitchTextContainer = document.getElementById("auth-switch-text")
 
-    let currentType = type
+    const currentType = type
 
     const setupSwitchLink = () => {
       const switchLink = document.getElementById("auth-switch-link")
@@ -793,7 +1059,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           token = data.token
           tokenExpires = new Date(data.expires)
           saveAuthData()
-          navigateTo('/feed')
+          navigateTo("/feed")
         } else {
           try {
             const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
@@ -814,7 +1080,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               token = loginData.token
               tokenExpires = new Date(loginData.expires)
               saveAuthData()
-              navigateTo('/feed')
+              navigateTo("/feed")
             } else {
               throw new Error("Auto-login failed")
             }
@@ -822,7 +1088,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             console.error("Auto-login error:", error)
             showMessage("Account created successfully! Please sign in.", "success", messageElement)
             setTimeout(() => {
-              navigateTo('/login')
+              navigateTo("/login")
             }, 2000)
           }
         }
@@ -889,7 +1155,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         `
 
     document.getElementById("create-blog-btn").addEventListener("click", () => {
-      navigateTo('/create-blog')
+      navigateTo("/create-blog")
     })
 
     setupSearchAndFilter()
@@ -899,7 +1165,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderCreateBlogPage() {
     currentPage = "create-blog"
     updateURL()
-    
+
     document.title = "Create Blog - FileBlogSystem"
 
     appContainer.innerHTML = `
@@ -1007,24 +1273,24 @@ document.addEventListener("DOMContentLoaded", async () => {
                         <div class="editor-panes">
                             <div class="editor-pane active" id="write-pane">
                                 <textarea id="markdown-editor" placeholder="Write your blog content in Markdown...
-
-# Example Heading
-
-This is a paragraph with **bold text** and *italic text*.
-
-## Subheading
-
-- List item 1
-- List item 2
-
-> This is a quote
-
-\`\`\`javascript
-// Code block
-console.log('Hello World');
-\`\`\`
-
-You can insert images anywhere by clicking the image button in the toolbar or using markdown syntax: ![Alt text](image-url)"></textarea>
+                                
+                                # Example Heading
+                                
+                                This is a paragraph with **bold text** and *italic text*.
+                                
+                                ## Subheading
+                                
+                                - List item 1
+                                - List item 2
+                                
+                                > This is a quote
+                                
+                                \`\`\`javascript
+                                // Code block
+                                console.log('Hello World');
+                                \`\`\`
+                                
+                                You can insert images anywhere by clicking the image button in the toolbar or using markdown syntax: ![Alt text](image-url)"></textarea>
                             </div>
                             
                             <div class="editor-pane" id="preview-pane">
@@ -1081,7 +1347,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
     const messageElement = document.getElementById("blog-message")
 
     backBtn.addEventListener("click", () => {
-      navigateTo('/feed')
+      navigateTo("/feed")
     })
 
     writeTab.addEventListener("click", () => {
@@ -1313,9 +1579,9 @@ You can insert images anywhere by clicking the image button in the toolbar or us
 
       setTimeout(() => {
         if (status === "draft") {
-          navigateTo('/drafts')
+          navigateTo("/drafts")
         } else {
-          navigateTo('/feed')
+          navigateTo("/feed")
         }
       }, 2000)
     } catch (error) {
@@ -1675,15 +1941,13 @@ You can insert images anywhere by clicking the image button in the toolbar or us
   function renderDraftsPage() {
     if (!isAuthenticated()) {
       showMessage("You must be logged in to view your drafts.", "error", appContainer)
-      navigateTo('/login')
+      navigateTo("/login")
       return
     }
 
-    // Update URL and page state
     currentPage = "drafts"
     updateURL()
-    
-    // Update page title
+
     document.title = "My Drafts & Posts - FileBlogSystem"
 
     appContainer.innerHTML = `
@@ -1847,7 +2111,6 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       publishedTimeValue = dateObj.toTimeString().substring(0, 5)
     }
 
-    // Update page title
     document.title = `Edit: ${postData.title} - FileBlogSystem`
 
     appContainer.innerHTML = `
@@ -1948,7 +2211,6 @@ You can insert images anywhere by clicking the image button in the toolbar or us
               <input type="file" id="image-upload" accept="image/*" style="display: none;">
             </div>
 
-            <!-- Editor panes moved directly under toolbar -->
             <div class="editor-content">
               <div class="editor-tabs">
                 <button class="tab-btn active" id="write-tab">Write</button>
@@ -2032,7 +2294,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
     let imageRemoved = false
 
     backBtn.addEventListener("click", () => {
-      navigateTo('/drafts')
+      navigateTo("/drafts")
     })
 
     writeTab.addEventListener("click", () => {
@@ -2209,9 +2471,9 @@ You can insert images anywhere by clicking the image button in the toolbar or us
         showMessage("Post updated successfully!", "success", messageElement)
         setTimeout(() => {
           if (updatedPost.isDraft) {
-            navigateTo('/drafts')
+            navigateTo("/drafts")
           } else {
-            navigateTo('/feed')
+            navigateTo("/feed")
           }
         }, 1500)
       } catch (error) {
@@ -2418,13 +2680,13 @@ You can insert images anywhere by clicking the image button in the toolbar or us
   function renderProfilePage() {
     if (!isAuthenticated()) {
       showMessage("You must be logged in to view your profile.", "error", appContainer)
-      navigateTo('/login')
+      navigateTo("/login")
       return
     }
 
     currentPage = "profile"
     updateURL()
-    
+
     document.title = "Profile - FileBlogSystem"
 
     appContainer.innerHTML = `
@@ -2476,7 +2738,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
       btn.addEventListener("click", (e) => {
         if (btn.id === "profile-logout") {
           clearAuthData()
-          navigateTo('/feed')
+          navigateTo("/welcome")
           return
         }
 
@@ -2572,7 +2834,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
           showMessage("Account deleted successfully!", "success", messageElement)
           setTimeout(() => {
             clearAuthData()
-            navigateTo('/feed')
+            navigateTo("/welcome")
           }, 1500)
         } catch (error) {
           showMessage(error.message, "error", messageElement)
@@ -2745,13 +3007,13 @@ You can insert images anywhere by clicking the image button in the toolbar or us
             `
 
       document.getElementById("profile-btn").addEventListener("click", () => {
-        navigateTo('/profile')
+        navigateTo("/profile")
       })
 
       document.querySelectorAll(".nav-btn[data-page]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const page = btn.dataset.page
-          if (page === 'admin') {
+          if (page === "admin") {
             navigateTo(`/admin?section=${currentAdminSection}`)
           } else {
             navigateTo(`/${page}`)
@@ -2768,10 +3030,10 @@ You can insert images anywhere by clicking the image button in the toolbar or us
                     </button>
                 `
       document.getElementById("nav-login").addEventListener("click", () => {
-        navigateTo('/login')
+        navigateTo("/login")
       })
       document.getElementById("nav-signup").addEventListener("click", () => {
-        navigateTo('/signup')
+        navigateTo("/signup")
       })
     }
   }
@@ -2779,13 +3041,13 @@ You can insert images anywhere by clicking the image button in the toolbar or us
   async function renderAdminPage() {
     if (!isAuthenticated() || !user.roles.includes("Admin")) {
       showMessage("You must be an admin to access this page.", "error", appContainer)
-      navigateTo('/feed')
+      navigateTo("/welcome")
       return
     }
 
     currentPage = "admin"
     updateURL()
-    
+
     document.title = "Admin Panel - FileBlogSystem"
 
     appContainer.innerHTML = `
@@ -3505,11 +3767,14 @@ You can insert images anywhere by clicking the image button in the toolbar or us
     updateNav()
 
     if (!isAuthenticated() && currentPage !== "login" && currentPage !== "signup") {
-      renderAuthForm("login")
+      await renderWelcomePage()
       return
     }
 
     switch (currentPage) {
+      case "welcome":
+        await renderWelcomePage()
+        break
       case "login":
         renderAuthForm("login")
         break
@@ -3526,7 +3791,7 @@ You can insert images anywhere by clicking the image button in the toolbar or us
         if (currentPostSlug) {
           await renderBlogPostPage(currentPostSlug)
         } else {
-          navigateTo('/feed')
+          navigateTo("/welcome")
         }
         break
       case "drafts":
@@ -3539,13 +3804,13 @@ You can insert images anywhere by clicking the image button in the toolbar or us
         await renderAdminPage()
         break
       default:
-        await renderDashboard()
+        await renderWelcomePage()
     }
   }
 
   loadAuthData()
   await fetchCategoriesAndTags()
   initializeRouting()
-  
+
   window.navigateTo = navigateTo
 })
