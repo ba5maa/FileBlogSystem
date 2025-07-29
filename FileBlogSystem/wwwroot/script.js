@@ -211,6 +211,26 @@ async function fetchPublicPosts(limit = 6) {
       })
       .slice(0, limit);
 
+    const userCache = new Map();
+
+    for (const post of sortedPosts) {
+      if (!userCache.has(post.authorUsername)) {
+        try {
+          const userResponse = await fetch(`${API_BASE_URL}/api/user/${post.authorUsername}`);
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            userCache.set(post.authorUsername, userData.profilePictureUrl);
+          } else {
+            userCache.set(post.authorUsername, null);
+          }
+        } catch (err) {
+          console.warn(`Profile fetch failed for ${post.authorUsername}:`, err);
+          userCache.set(post.authorUsername, null);
+        }
+      }
+      post.authorProfilePictureUrl = userCache.get(post.authorUsername);
+    }
+
     return sortedPosts;
   } catch (error) {
     console.error("Error fetching public posts:", error);
@@ -257,6 +277,372 @@ function convertMarkdownToHtml(markdownText) {
 
   return html;
 }
+
+ async function renderBlogPostPage(slug) {
+    // if (!isAuthenticated()) {
+    //   navigateTo("/welcome")
+    //   return
+    // }
+    console.log("DEBUG just seeing slug:", slug)
+    currentPage = "blog-post"
+    currentPostSlug = slug
+    updateURL()
+
+    appContainer.innerHTML = `
+      <div class="blog-post-page">
+        <div class="blog-post-header">
+          <button class="back-btn" id="back-to-feed">
+            <i class="fas fa-arrow-left"></i>
+            ${isAuthenticated() ? "Back to Feed" : "Back to loved blogs"}
+          </button>
+        </div>
+        <div class="blog-post-layout">
+          <div class="blog-post-main">
+            <div class="loading-posts">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>Loading blog post...</p>
+            </div>
+          </div>
+          <div class="blog-post-sidebar">
+            <div class="sidebar-sticky-container">
+              <div class="post-engagement-sidebar">
+                <div class="engagement-stats">
+                  <button class="like-btn-sidebar" id="like-btn-sidebar">
+                    <i class="fas fa-heart"></i>
+                    <span>Like</span>
+                  </button>
+                  <span class="like-count-sidebar">0 likes</span>
+                </div>
+              </div>
+              
+              <div class="comments-sidebar">
+                <div class="comments-header">
+                  <h3><i class="fas fa-comments"></i> Comments</h3>
+                </div>
+                <div class="loading-comments">
+                  <i class="fas fa-spinner fa-spin"></i>
+                  <p>Loading comments...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+
+    document.getElementById("back-to-feed").addEventListener("click", () => {
+      navigateTo("/feed")
+    })
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/post/${slug}`)
+      if (!response.ok) {
+        throw new Error("Failed to load blog post")
+      }
+
+      const post = await response.json()
+
+      try {
+        const userResponse = await fetch(`${API_BASE_URL}/api/user/${post.authorUsername}`)
+        if (userResponse.ok) {
+          const userData = await userResponse.json()
+          post.authorProfilePictureUrl = userData.profilePictureUrl
+        }
+      } catch (error) {
+        post.authorProfilePictureUrl = null
+      }
+
+      const blogMain = document.querySelector(".blog-post-main")
+      const isLikedByCurrentUser = post.likedByUsers?.includes(user?.username)
+      const likeCount = post.likedByUsers?.length || 0
+
+      document.title = `${post.title} - FileBlogSystem`
+
+      console.log("DEBUG just seeing blogmain:", blogMain)
+
+      blogMain.innerHTML = `
+        <article class="blog-post-article">
+          <header class="blog-post-article-header">
+            <h1 class="blog-post-title">${post.title}</h1>
+            
+            <div class="blog-post-meta">
+              <div class="blog-post-author">
+                <img src="${post.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}?width=400&height=250&mode=crop" class="author-avatar-large" alt="Author Avatar" />
+                <div class="author-info">
+                  <span class="author-name">@${post.authorUsername}</span>
+                  <span class="publish-date">${formatDate(post.publishedDate || post.creationDate)}</span>
+                </div>
+              </div>
+              
+              <div class="blog-post-tags">
+                ${
+                  post.categories && Array.isArray(post.categories)
+                    ? post.categories
+                        .map(
+                          (cat) => `
+                  <span class="category-tag">
+                    <i class="fas fa-folder"></i>
+                    ${getCategoryNameById(cat)}
+                  </span>
+                `,
+                        )
+                        .join("")
+                    : ""
+                }
+                ${
+                  post.tags && post.tags.length > 0
+                    ? post.tags
+                        .map(
+                          (tag) => `
+                  <span class="tag">
+                    <i class="fas fa-tag"></i>
+                    ${getTagNameById(tag)}
+                  </span>
+                `,
+                        )
+                        .join("")
+                    : ""
+                }
+              </div>
+            </div>
+          </header>
+
+          <div class="blog-post-content">
+            ${convertMarkdownToHtml(post.content)}
+          </div>
+        </article>
+      `
+
+      const likeBtnSidebar = document.getElementById("like-btn-sidebar")
+      const likeCountSidebar = document.querySelector(".like-count-sidebar")
+
+      if (likeBtnSidebar && likeCountSidebar) {
+        likeBtnSidebar.classList.toggle("liked", isLikedByCurrentUser)
+        likeBtnSidebar.querySelector("span").textContent = isLikedByCurrentUser ? "Liked" : "Like"
+        likeCountSidebar.textContent = `${likeCount} like${likeCount !== 1 ? "s" : ""}`
+        likeBtnSidebar.dataset.postId = post.id
+
+        likeBtnSidebar.addEventListener("click", async (e) => {
+          e.preventDefault()
+          const postId = likeBtnSidebar.dataset.postId
+          const isLiked = likeBtnSidebar.classList.contains("liked")
+
+          try {
+            const url = `${API_BASE_URL}/api/post/${postId}/${isLiked ? "unlike" : "like"}`
+            const response = await fetchAuthenticated(url, { method: "POST" })
+            if (!response.ok) throw new Error("Failed to update like")
+
+            const result = await response.json()
+            const newCount = result.likedBy?.length || 0
+
+            likeBtnSidebar.classList.toggle("liked")
+            likeBtnSidebar.querySelector("span").textContent = isLiked ? "Like" : "Liked"
+            likeCountSidebar.textContent = `${newCount} like${newCount !== 1 ? "s" : ""}`
+          } catch (err) {
+            console.error("Like toggle error:", err)
+          }
+        })
+      }
+
+      loadCommentsInSidebar(post.slug)
+    } catch (error) {
+      console.error("Error loading blog post:", error)
+      document.querySelector(".blog-post-main").innerHTML = `
+        <div class="error-state">
+          <i class="fas fa-exclamation-triangle"></i>
+          <p>Error loading blog post: ${error.message}</p>
+          <button class="btn btn-primary" onclick="navigateTo('/welcome')">
+            <i class="fas fa-home"></i>
+            Go to Welcome
+          </button>
+        </div>
+      `
+      document.title = "FileBlogSystem"
+    }
+  }
+
+  async function loadCommentsInSidebar(slug) {
+    const sidebar = document.querySelector(".comments-sidebar")
+
+    try {
+      const comments = await fetchCommentsForPost(slug)
+
+      sidebar.innerHTML = `
+        <div class="comments-header">
+          <h3><i class="fas fa-comments"></i> Comments (${comments.length})</h3>
+        </div>
+        
+        ${
+          isAuthenticated()
+            ? `
+            <div class="comment-form">
+              <textarea class="comment-input" placeholder="Write a comment..." data-post-slug="${slug}"></textarea>
+              <button class="comment-submit-btn" data-post-slug="${slug}">
+                <i class="fas fa-paper-plane"></i>
+                Post Comment
+              </button>
+            </div>
+          `
+            : '<div class="login-to-comment">Please log in to comment</div>'
+        }
+        
+        <div class="comments-list" data-post-slug="${slug}">
+        </div>
+      `
+
+      const commentsList = sidebar.querySelector(".comments-list")
+      displayComments(comments, commentsList)
+
+      const commentSubmitBtn = sidebar.querySelector(".comment-submit-btn")
+      if (commentSubmitBtn) {
+        commentSubmitBtn.addEventListener("click", async (e) => {
+          e.preventDefault()
+          const commentInput = sidebar.querySelector(".comment-input")
+
+          if (!commentInput.value.trim()) return
+
+          const originalText = commentSubmitBtn.innerHTML
+          commentSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...'
+          commentSubmitBtn.disabled = true
+
+          try {
+            const newComment = await addCommentToPost(slug, commentInput.value.trim())
+            if (newComment) {
+              commentInput.value = ""
+              loadCommentsInSidebar(slug)
+            }
+          } catch (error) {
+            console.error("Error adding comment:", error)
+          } finally {
+            commentSubmitBtn.innerHTML = originalText
+            commentSubmitBtn.disabled = false
+          }
+        })
+      }
+    } catch (error) {
+      sidebar.innerHTML = `
+        <div class="comments-header">
+          <h3><i class="fas fa-comments"></i> Comments</h3>
+        </div>
+        <p class="error-loading-comments">Error loading comments</p>
+      `
+    }
+  }
+
+  async function fetchCommentsForPost(postSlug) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/post/${postSlug}/comments`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch comments: ${response.status}`)
+      }
+      const comments = await response.json()
+
+      for (const comment of comments) {
+        try {
+          const userResponse = await fetch(`${API_BASE_URL}/api/user/${comment.username}`)
+          if (userResponse.ok) {
+            const userData = await userResponse.json()
+            comment.authorProfilePictureUrl = userData.profilePictureUrl
+          }
+        } catch (error) {
+          comment.authorProfilePictureUrl = null
+        }
+      }
+
+      return comments
+    } catch (error) {
+      console.error("Error fetching comments:", error)
+      return []
+    }
+  }
+
+  async function addCommentToPost(postSlug, commentContent) {
+    try {
+      const commentData = {
+        content: commentContent,
+        username: user.username,
+        createdAt: new Date().toISOString(),
+      }
+
+      const response = await fetchAuthenticated(`${API_BASE_URL}/api/post/${postSlug}/comment`, {
+        method: "POST",
+        body: JSON.stringify(commentData),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to add comment: ${response.status}`)
+      }
+
+      const newComment = await response.json()
+      return newComment
+    } catch (error) {
+      console.error("Error adding comment:", error)
+      return null
+    }
+  }
+
+  function displayComments(comments, commentsList) {
+    commentsList.innerHTML = ""
+
+    if (comments.length === 0) {
+      commentsList.innerHTML = '<div class="no-comments">No comments yet. Be the first to comment!</div>'
+      return
+    }
+
+    comments.forEach((comment) => {
+      const commentElement = document.createElement("div")
+      commentElement.className = "comment-item"
+      commentElement.innerHTML = `
+        <div class="comment-header">
+          <div class="comment-author">
+            <img src="${comment.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="avatar-img" alt="Avatar" />
+            @${comment.username}
+          </div>
+          <div class="comment-date">${formatDate(comment.createdAt)}</div>
+        </div>
+        <p class="comment-content">${comment.content}</p>
+      `
+      commentsList.appendChild(commentElement)
+    })
+  }
+
+  async function fetchCategoriesAndTags() {
+    try {
+      let categoriesRes, tagsRes
+
+      try {
+        categoriesRes = await fetch(`${API_BASE_URL}/api/categories`)
+        tagsRes = await fetch(`${API_BASE_URL}/api/tags`)
+      } catch (error) {
+        if (isAuthenticated()) {
+          categoriesRes = await fetchAuthenticated(`${API_BASE_URL}/api/categories`)
+          tagsRes = await fetchAuthenticated(`${API_BASE_URL}/api/tags`)
+        } else {
+          throw error
+        }
+      }
+
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json()
+        CATEGORIES = categoriesData
+      } else {
+        console.warn("Could not fetch categories. Using empty array.", await categoriesRes.text())
+        CATEGORIES = []
+      }
+
+      if (tagsRes.ok) {
+        const tagsData = await tagsRes.json()
+        TAGS = tagsData
+      } else {
+        console.warn("Could not fetch tags. Using empty array.", await tagsRes.text())
+        TAGS = []
+      }
+    } catch (error) {
+      console.error("Error fetching categories or tags:", error)
+      CATEGORIES = []
+      TAGS = []
+    }
+  }
 
 async function renderWelcomePage() {
   currentPage = "welcome";
@@ -430,7 +816,7 @@ async function loadPopularPosts() {
           
           <div class="post-footer">
             <div class="author-info">
-              <img src="/placeholder.svg?height=32&width=32" alt="Author Avatar" />
+              <img src="${post.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" alt="Author Avatar" />
               <div>
                 <div class="author-username">@${post.authorUsername}</div>
                 <div class="post-date">${formatDate(post.publishedDate || post.creationDate)}</div>
@@ -452,8 +838,11 @@ async function loadPopularPosts() {
       `;
       
       postCard.addEventListener("click", () => {
-        if (isAuthenticated()) {
+        console.log("DEBUG just seeing post slug:", post.slug)
+        if (post.slug) {
+          currentPostSlug = post.slug;
           navigateTo(`/post/${post.slug}`);
+          renderBlogPostPage(post.slug);
         } else {
           if (confirm("Please sign in to read the full article. Would you like to sign in now?")) {
             navigateTo("/login");
@@ -474,369 +863,7 @@ async function loadPopularPosts() {
     `;
   }
 }
-  async function renderBlogPostPage(slug) {
-    if (!isAuthenticated()) {
-      navigateTo("/welcome")
-      return
-    }
-
-    currentPage = "blog-post"
-    currentPostSlug = slug
-    updateURL()
-
-    appContainer.innerHTML = `
-      <div class="blog-post-page">
-        <div class="blog-post-header">
-          <button class="back-btn" id="back-to-feed">
-            <i class="fas fa-arrow-left"></i>
-            Back to Feed
-          </button>
-        </div>
-        <div class="blog-post-layout">
-          <div class="blog-post-main">
-            <div class="loading-posts">
-              <i class="fas fa-spinner fa-spin"></i>
-              <p>Loading blog post...</p>
-            </div>
-          </div>
-          <div class="blog-post-sidebar">
-            <div class="sidebar-sticky-container">
-              <div class="post-engagement-sidebar">
-                <div class="engagement-stats">
-                  <button class="like-btn-sidebar" id="like-btn-sidebar">
-                    <i class="fas fa-heart"></i>
-                    <span>Like</span>
-                  </button>
-                  <span class="like-count-sidebar">0 likes</span>
-                </div>
-              </div>
-              
-              <div class="comments-sidebar">
-                <div class="comments-header">
-                  <h3><i class="fas fa-comments"></i> Comments</h3>
-                </div>
-                <div class="loading-comments">
-                  <i class="fas fa-spinner fa-spin"></i>
-                  <p>Loading comments...</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `
-
-    document.getElementById("back-to-feed").addEventListener("click", () => {
-      navigateTo("/feed")
-    })
-
-    try {
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/post/${slug}`)
-      if (!response.ok) {
-        throw new Error("Failed to load blog post")
-      }
-
-      const post = await response.json()
-
-      try {
-        const userResponse = await fetchAuthenticated(`${API_BASE_URL}/api/user/${post.authorUsername}`)
-        if (userResponse.ok) {
-          const userData = await userResponse.json()
-          post.authorProfilePictureUrl = userData.profilePictureUrl
-        }
-      } catch (error) {
-        post.authorProfilePictureUrl = null
-      }
-
-      const blogMain = document.querySelector(".blog-post-main")
-      const isLikedByCurrentUser = post.likedByUsers?.includes(user?.username)
-      const likeCount = post.likedByUsers?.length || 0
-
-      document.title = `${post.title} - FileBlogSystem`
-
-      blogMain.innerHTML = `
-        <article class="blog-post-article">
-          <header class="blog-post-article-header">
-            <h1 class="blog-post-title">${post.title}</h1>
-            
-            <div class="blog-post-meta">
-              <div class="blog-post-author">
-                <img src="${post.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}?width=400&height=250&mode=crop" class="author-avatar-large" alt="Author Avatar" />
-                <div class="author-info">
-                  <span class="author-name">@${post.authorUsername}</span>
-                  <span class="publish-date">${formatDate(post.publishedDate || post.creationDate)}</span>
-                </div>
-              </div>
-              
-              <div class="blog-post-tags">
-                ${
-                  post.categories && Array.isArray(post.categories)
-                    ? post.categories
-                        .map(
-                          (cat) => `
-                  <span class="category-tag">
-                    <i class="fas fa-folder"></i>
-                    ${getCategoryNameById(cat)}
-                  </span>
-                `,
-                        )
-                        .join("")
-                    : ""
-                }
-                ${
-                  post.tags && post.tags.length > 0
-                    ? post.tags
-                        .map(
-                          (tag) => `
-                  <span class="tag">
-                    <i class="fas fa-tag"></i>
-                    ${getTagNameById(tag)}
-                  </span>
-                `,
-                        )
-                        .join("")
-                    : ""
-                }
-              </div>
-            </div>
-          </header>
-
-          <div class="blog-post-content">
-            ${convertMarkdownToHtml(post.content)}
-          </div>
-        </article>
-      `
-
-      const likeBtnSidebar = document.getElementById("like-btn-sidebar")
-      const likeCountSidebar = document.querySelector(".like-count-sidebar")
-
-      if (likeBtnSidebar && likeCountSidebar) {
-        likeBtnSidebar.classList.toggle("liked", isLikedByCurrentUser)
-        likeBtnSidebar.querySelector("span").textContent = isLikedByCurrentUser ? "Liked" : "Like"
-        likeCountSidebar.textContent = `${likeCount} like${likeCount !== 1 ? "s" : ""}`
-        likeBtnSidebar.dataset.postId = post.id
-
-        likeBtnSidebar.addEventListener("click", async (e) => {
-          e.preventDefault()
-          const postId = likeBtnSidebar.dataset.postId
-          const isLiked = likeBtnSidebar.classList.contains("liked")
-
-          try {
-            const url = `${API_BASE_URL}/api/post/${postId}/${isLiked ? "unlike" : "like"}`
-            const response = await fetchAuthenticated(url, { method: "POST" })
-            if (!response.ok) throw new Error("Failed to update like")
-
-            const result = await response.json()
-            const newCount = result.likedBy?.length || 0
-
-            likeBtnSidebar.classList.toggle("liked")
-            likeBtnSidebar.querySelector("span").textContent = isLiked ? "Like" : "Liked"
-            likeCountSidebar.textContent = `${newCount} like${newCount !== 1 ? "s" : ""}`
-          } catch (err) {
-            console.error("Like toggle error:", err)
-          }
-        })
-      }
-
-      loadCommentsInSidebar(post.slug)
-    } catch (error) {
-      console.error("Error loading blog post:", error)
-      document.querySelector(".blog-post-main").innerHTML = `
-        <div class="error-state">
-          <i class="fas fa-exclamation-triangle"></i>
-          <p>Error loading blog post: ${error.message}</p>
-          <button class="btn btn-primary" onclick="navigateTo('/welcome')">
-            <i class="fas fa-home"></i>
-            Go to Welcome
-          </button>
-        </div>
-      `
-      document.title = "FileBlogSystem"
-    }
-  }
-
-  async function loadCommentsInSidebar(slug) {
-    const sidebar = document.querySelector(".comments-sidebar")
-
-    try {
-      const comments = await fetchCommentsForPost(slug)
-
-      sidebar.innerHTML = `
-        <div class="comments-header">
-          <h3><i class="fas fa-comments"></i> Comments (${comments.length})</h3>
-        </div>
-        
-        ${
-          isAuthenticated()
-            ? `
-            <div class="comment-form">
-              <textarea class="comment-input" placeholder="Write a comment..." data-post-slug="${slug}"></textarea>
-              <button class="comment-submit-btn" data-post-slug="${slug}">
-                <i class="fas fa-paper-plane"></i>
-                Post Comment
-              </button>
-            </div>
-          `
-            : '<div class="login-to-comment">Please log in to comment</div>'
-        }
-        
-        <div class="comments-list" data-post-slug="${slug}">
-        </div>
-      `
-
-      const commentsList = sidebar.querySelector(".comments-list")
-      displayComments(comments, commentsList)
-
-      const commentSubmitBtn = sidebar.querySelector(".comment-submit-btn")
-      if (commentSubmitBtn) {
-        commentSubmitBtn.addEventListener("click", async (e) => {
-          e.preventDefault()
-          const commentInput = sidebar.querySelector(".comment-input")
-
-          if (!commentInput.value.trim()) return
-
-          const originalText = commentSubmitBtn.innerHTML
-          commentSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...'
-          commentSubmitBtn.disabled = true
-
-          try {
-            const newComment = await addCommentToPost(slug, commentInput.value.trim())
-            if (newComment) {
-              commentInput.value = ""
-              loadCommentsInSidebar(slug)
-            }
-          } catch (error) {
-            console.error("Error adding comment:", error)
-          } finally {
-            commentSubmitBtn.innerHTML = originalText
-            commentSubmitBtn.disabled = false
-          }
-        })
-      }
-    } catch (error) {
-      sidebar.innerHTML = `
-        <div class="comments-header">
-          <h3><i class="fas fa-comments"></i> Comments</h3>
-        </div>
-        <p class="error-loading-comments">Error loading comments</p>
-      `
-    }
-  }
-
-  async function fetchCommentsForPost(postSlug) {
-    try {
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/post/${postSlug}/comments`)
-      if (!response.ok) {
-        throw new Error(`Failed to fetch comments: ${response.status}`)
-      }
-      const comments = await response.json()
-
-      for (const comment of comments) {
-        try {
-          const userResponse = await fetchAuthenticated(`${API_BASE_URL}/api/user/${comment.username}`)
-          if (userResponse.ok) {
-            const userData = await userResponse.json()
-            comment.authorProfilePictureUrl = userData.profilePictureUrl
-          }
-        } catch (error) {
-          comment.authorProfilePictureUrl = null
-        }
-      }
-
-      return comments
-    } catch (error) {
-      console.error("Error fetching comments:", error)
-      return []
-    }
-  }
-
-  async function addCommentToPost(postSlug, commentContent) {
-    try {
-      const commentData = {
-        content: commentContent,
-        username: user.username,
-        createdAt: new Date().toISOString(),
-      }
-
-      const response = await fetchAuthenticated(`${API_BASE_URL}/api/post/${postSlug}/comment`, {
-        method: "POST",
-        body: JSON.stringify(commentData),
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to add comment: ${response.status}`)
-      }
-
-      const newComment = await response.json()
-      return newComment
-    } catch (error) {
-      console.error("Error adding comment:", error)
-      return null
-    }
-  }
-
-  function displayComments(comments, commentsList) {
-    commentsList.innerHTML = ""
-
-    if (comments.length === 0) {
-      commentsList.innerHTML = '<div class="no-comments">No comments yet. Be the first to comment!</div>'
-      return
-    }
-
-    comments.forEach((comment) => {
-      const commentElement = document.createElement("div")
-      commentElement.className = "comment-item"
-      commentElement.innerHTML = `
-        <div class="comment-header">
-          <div class="comment-author">
-            <img src="${comment.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="avatar-img" alt="Avatar" />
-            @${comment.username}
-          </div>
-          <div class="comment-date">${formatDate(comment.createdAt)}</div>
-        </div>
-        <p class="comment-content">${comment.content}</p>
-      `
-      commentsList.appendChild(commentElement)
-    })
-  }
-
-  async function fetchCategoriesAndTags() {
-    try {
-      let categoriesRes, tagsRes
-
-      try {
-        categoriesRes = await fetch(`${API_BASE_URL}/api/categories`)
-        tagsRes = await fetch(`${API_BASE_URL}/api/tags`)
-      } catch (error) {
-        if (isAuthenticated()) {
-          categoriesRes = await fetchAuthenticated(`${API_BASE_URL}/api/categories`)
-          tagsRes = await fetchAuthenticated(`${API_BASE_URL}/api/tags`)
-        } else {
-          throw error
-        }
-      }
-
-      if (categoriesRes.ok) {
-        const categoriesData = await categoriesRes.json()
-        CATEGORIES = categoriesData
-      } else {
-        console.warn("Could not fetch categories. Using empty array.", await categoriesRes.text())
-        CATEGORIES = []
-      }
-
-      if (tagsRes.ok) {
-        const tagsData = await tagsRes.json()
-        TAGS = tagsData
-      } else {
-        console.warn("Could not fetch tags. Using empty array.", await tagsRes.text())
-        TAGS = []
-      }
-    } catch (error) {
-      console.error("Error fetching categories or tags:", error)
-      CATEGORIES = []
-      TAGS = []
-    }
-  }
+ 
 
   function renderAuthForm(type = "login") {
     currentPage = type
@@ -1691,7 +1718,7 @@ async function loadPopularPosts() {
     for (const post of posts) {
       if (!userCache.has(post.authorUsername)) {
         try {
-          const userResponse = await fetchAuthenticated(`${API_BASE_URL}/api/user/${post.authorUsername}`)
+          const userResponse = await fetch(`${API_BASE_URL}/api/user/${post.authorUsername}`)
           if (userResponse.ok) {
             const userData = await userResponse.json()
             userCache.set(post.authorUsername, userData.profilePictureUrl)

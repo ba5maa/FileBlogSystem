@@ -47,7 +47,8 @@ namespace FileBlogSystem.Endpoints
                     (p.Title?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false) ||
                     (p.Description?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false) ||
                     (p.Content?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false) ||
-                    (p.AuthorUsername?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false));
+                    (p.AuthorUsername?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false))
+                    .AsQueryable();
                 }
 
                 if (!string.IsNullOrEmpty(tag) && Guid.TryParse(tag, out Guid tagId))
@@ -124,6 +125,7 @@ namespace FileBlogSystem.Endpoints
                 });
             })
             //.RequireAuthorization()
+            .AllowAnonymous()
             .WithName(EndpointConstants.GetPostBySlug)
             .Produces<object>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound)
@@ -595,7 +597,7 @@ namespace FileBlogSystem.Endpoints
                var comments = await contentService.GetCommentsAsync(slug);
                return Results.Ok(comments);
            })
-           .RequireAuthorization()
+           //.RequireAuthorization()
            .WithName(EndpointConstants.GetCommentsForPost)
            .Produces<List<CommentModel>>(StatusCodes.Status200OK);
                        
@@ -607,7 +609,7 @@ namespace FileBlogSystem.Endpoints
                 var success = await contentService.AddCommentAsync(slug, input);
                 return success ? Results.Ok(input) : Results.NotFound(string.Format(EndpointConstants.PostNotFound, slug));
             })
-            .RequireAuthorization()
+            //.RequireAuthorization()
             .WithName(EndpointConstants.AddComment)
             .Produces<CommentModel>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
