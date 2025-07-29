@@ -43,7 +43,7 @@ namespace FileBlogSystem.Endpoints
                 if (!string.IsNullOrEmpty(searchTerm))
                 {
                     var lowerSearchTerm = searchTerm.ToLowerInvariant();
-                    var result = filteredPosts.ToList().Where(p =>
+                    filteredPosts = filteredPosts.ToList().Where(p =>
                     (p.Title?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false) ||
                     (p.Description?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false) ||
                     (p.Content?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false) ||

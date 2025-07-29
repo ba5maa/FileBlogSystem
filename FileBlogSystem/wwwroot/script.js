@@ -1660,7 +1660,7 @@ async function loadPopularPosts() {
     const searchInput = document.getElementById("search-input")
     const tagFilter = document.getElementById("tag-filter")
 
-    if (searchInput && tagFilter) {
+    if (searchInput || tagFilter) {
       searchInput.addEventListener(
         "input",
         debounce(() => {
@@ -1853,10 +1853,12 @@ async function loadPopularPosts() {
     }
     queryParams.append("IsDraft", "false")
 
+    console.log("Loading posts with params:", queryParams.toString())
+
     const url = `${API_BASE_URL}/api/posts?${queryParams.toString()}`
 
     try {
-      const response = await fetchAuthenticated(url)
+      const response = await fetch(url)
 
       if (!response.ok) {
         const errorData = response.headers.get("Content-Type")?.includes("application/json")
