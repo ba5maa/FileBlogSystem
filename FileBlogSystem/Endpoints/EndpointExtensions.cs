@@ -63,6 +63,12 @@ namespace FileBlogSystem.Endpoints
                          continue;
                      }
 
+                     var author = await contentService.GetUserByUsernameAsync(meta.AuthorUsername);
+                     if (author == null || author.IsActive == false)
+                     {
+                         continue;
+                     }
+
                     var content = await contentService.GetBlogPostContentAsync(meta.PostFolderPath!);
                     posts.Add(new
                     {

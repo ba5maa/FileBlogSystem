@@ -1,0 +1,22 @@
+{
+  "Id": "487f9eeb-d6f7-4543-a11e-d2360f6eed51",
+  "Title": "basmaa post",
+  "Description": "",
+  "CreationDate": "0001-01-01T00:00:00",
+  "PublishedDate": "2025-07-30T21:39:41.791Z",
+  "ModificationDate": "2025-07-30T21:39:41.8180668Z",
+  "Tags": [
+    "3b53d125-b543-4931-99bd-4d16d3a83fb6"
+  ],
+  "Categories": [
+    "84b73196-d5de-4896-8231-a540fb1e5b16"
+  ],
+  "CustomUrl": null,
+  "Slug": "basmaa-post",
+  "isDraft": false,
+  "Content": "",
+  "ImageUrl": null,
+  "AuthorUsername": "basmaa",
+  "ScheduledFor": null,
+  "LikedByUsers": []
+}

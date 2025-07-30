@@ -1075,7 +1075,14 @@ async function loadPopularPosts() {
               headers: { Authorization: `Bearer ${data.token}` },
             })
             if (userResponse.ok) {
-              const fullUserData = await userResponse.json()
+               const fullUserData = await userResponse.json()
+       
+            if (fullUserData.isActive === false) {
+                showMessage("Your account is inactive.", "error", messageElement)
+                showFieldError("username", "Your account is inactive.")
+                showFieldError("password", "Your account is inactive.")
+                return
+              }
               user = {
                 username: data.user.username,
                 roles: data.user.roles || ["Author"],
