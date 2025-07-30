@@ -645,6 +645,31 @@ namespace FileBlogSystem.Endpoints
                 }
             });
 
+            app.MapPost("/api/post/{slug}/upload-image", async (string slug, HttpRequest request, IFileContentService contentService) =>
+             {
+                 var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+                 var postFolderName = $"{today}-{slug}";
+                 var postFolderPath = Path.Combine("content", "posts", postFolderName);
+             
+                 var assetsPath = Path.Combine(postFolderPath, "assets");
+                 Directory.CreateDirectory(assetsPath); 
+             
+                 var file = request.Form.Files["image"];
+                 if (file == null || file.Length == 0)
+                     return Results.BadRequest("No image uploaded.");
+             
+                 var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+                 var fullPath = Path.Combine(assetsPath, fileName);
+             
+                 using var stream = new FileStream(fullPath, FileMode.Create);
+                 await file.CopyToAsync(stream);
+             
+                 var relativeUrl = $"/content/posts/{postFolderName}/assets/{fileName}";
+                 return Results.Ok(new { imageUrl = relativeUrl });
+             });
+             
+            
+
             return app;
         }
     }

@@ -1118,11 +1118,28 @@ async function loadPopularPosts() {
             const loginData = await loginResponse.json()
 
             if (loginResponse.ok) {
-              user = { username: loginData.user.username, roles: loginData.user.roles || ["Author"] }
-              token = loginData.token
-              tokenExpires = new Date(loginData.expires)
-              saveAuthData()
-              navigateTo("/feed")
+              try {
+                 const userResponse = await fetch(`${API_BASE_URL}/api/user/${loginData.user.username}`, {
+                   headers: { Authorization: `Bearer ${loginData.token}` },
+                 });
+                 if (userResponse.ok) {
+                  const fullUserData = await userResponse.json();
+                  user = {
+                    username: loginData.user.username,
+                    roles: loginData.user.roles || ["Author"],
+                    email: fullUserData.email,
+                  };
+                } else {
+                  user = { username: loginData.user.username, roles: loginData.user.roles || ["Author"] };
+                }
+              } catch (error) {
+                user = { username: loginData.user.username, roles: loginData.user.roles || ["Author"] };
+              }
+            
+              token = loginData.token;
+              tokenExpires = new Date(loginData.expires);
+              saveAuthData();
+              navigateTo("/feed");
             } else {
               throw new Error("Auto-login failed")
             }
@@ -1519,6 +1536,8 @@ async function loadPopularPosts() {
   function setupToolbar() {
     const editor = document.getElementById("markdown-editor")
     const imageUpload = document.getElementById("image-upload")
+    const messageElement = document.getElementById("blog-message");
+
 
     document.getElementById("bold-btn").addEventListener("click", () => {
       insertMarkdown("**", "**", "bold text")
@@ -1544,17 +1563,35 @@ async function loadPopularPosts() {
     })
 
     imageUpload.addEventListener("change", async (e) => {
-      const file = e.target.files[0]
+      const file = e.target.files[0];
       if (file) {
         try {
-          const base64 = await readFileAsBase64(file)
-          const altText = prompt("Enter alt text for the image:") || "Image"
-          insertMarkdown("![", `](${base64})`, altText)
+          const title = document.getElementById("blog-title")?.value.trim();
+          const tempSlug = title ? title.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]+/g, "") : "temp";
+    
+          const formData = new FormData();
+          formData.append("image", file);
+    
+          const response = await fetch(`${API_BASE_URL}/api/post/${tempSlug}/upload-image`, {
+            method: "POST",
+            body: formData,
+          });
+    
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.message || "Image upload failed");
+    
+          const altText = prompt("Enter alt text for the image:") || "Image";
+          const imageUrl = data.imageUrl;
+    
+          insertMarkdown("![", `](${imageUrl})`, altText);
         } catch (error) {
-          showMessage("Error uploading image: " + error.message, "error", document.getElementById("blog-message"))
+          const messageElement = document.getElementById("blog-message");
+          showMessage("Error uploading image: " + error.message, "error", messageElement);
         }
       }
-    })
+    });
+    
+       
 
     document.getElementById("code-btn").addEventListener("click", () => {
       insertMarkdown("`", "`", "code")
@@ -2513,6 +2550,8 @@ async function loadPopularPosts() {
         publishedDate: publishedDate,
         ImageUrl: postData.ImageUrl,
         Base64Image: postData.Base64Image || null,
+        ExplicitlyRemoveImage: imageRemoved === true
+        
       }
 
       if (editPostImageInput.files.length > 0) {
@@ -2526,6 +2565,8 @@ async function loadPopularPosts() {
         }
       } else if (imageRemoved) {
         updatedPost.ImageUrl = null
+        updatedPost.ExplicitlyRemoveImage = true;
+
       } else {
         updatedPost.ImageUrl = postData.ImageUrl
       }
@@ -2570,6 +2611,7 @@ async function loadPopularPosts() {
     function setupEditToolbar() {
       const editor = document.getElementById("markdown-editor")
       const imageUpload = document.getElementById("image-upload")
+      const messageElement = document.getElementById("blog-message");
 
       document.getElementById("bold-btn").addEventListener("click", () => {
         insertMarkdown("**", "**", "bold text")
@@ -2594,18 +2636,36 @@ async function loadPopularPosts() {
         imageUpload.click()
       })
 
-      imageUpload.addEventListener("change", async (e) => {
-        const file = e.target.files[0]
-        if (file) {
-          try {
-            const base64 = await readFileAsBase64(file)
-            const altText = prompt("Enter alt text for the image:") || "Image"
-            insertMarkdown("![", `](${base64})`, altText)
-          } catch (error) {
-            showMessage("Error uploading image: " + error.message, "error", messageElement)
-          }
-        }
-      })
+     imageUpload.addEventListener("change", async (e) => {
+           const file = e.target.files[0];
+           if (file) {
+             try {
+               const title = document.getElementById("blog-title")?.value.trim();
+               const tempSlug = title ? title.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]+/g, "") : "temp";
+         
+               const formData = new FormData();
+               formData.append("image", file);
+         
+               const response = await fetch(`${API_BASE_URL}/api/post/${tempSlug}/upload-image`, {
+                 method: "POST",
+                 body: formData,
+               });
+         
+               const data = await response.json();
+               if (!response.ok) throw new Error(data.message || "Image upload failed");
+         
+               const altText = prompt("Enter alt text for the image:") || "Image";
+               const imageUrl = data.imageUrl;
+         
+               insertMarkdown("![", `](${imageUrl})`, altText);
+             } catch (error) {
+               const messageElement = document.getElementById("blog-message");
+               showMessage("Error uploading image: " + error.message, "error", messageElement);
+             }
+           }
+         });
+         
+      
 
       document.getElementById("code-btn").addEventListener("click", () => {
         insertMarkdown("`", "`", "code")

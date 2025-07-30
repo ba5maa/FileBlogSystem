@@ -374,6 +374,7 @@ namespace FileBlogSystem.Services
         public async Task<BlogPostMetaResponse?> UpdateBlogPostAsync(string originalSlug, UpdateBlogPostRequest request)
         {
             var existingPostMeta = await GetBlogPostMetaBySlugAsync(originalSlug);
+            
             if (existingPostMeta == null || string.IsNullOrEmpty(existingPostMeta.PostFolderPath))
             {
                 _logger.LogWarning($"Attempted to update non existent or pathless post with slug: {originalSlug}");
@@ -431,6 +432,10 @@ namespace FileBlogSystem.Services
             existingPostMeta.PublishedDate = request.PublishedDate;
             existingPostMeta.ScheduledFor = request.ScheduledFor;
 
+            if (existingPostMeta.ImageUrl == null && request.Base64Image == null)
+            {
+                existingPostMeta.ImageUrl = existingPostMeta.ImageUrl;
+            }
 
             if (!string.IsNullOrEmpty(request.Base64Image))
             {
@@ -461,24 +466,25 @@ namespace FileBlogSystem.Services
                     existingPostMeta.ImageUrl = $"/content/posts/{newPostFolderName}/assets/{imageFileName}";
                 }
             }
-            else if (request.ImageUrl == null && existingPostMeta.ImageUrl != null)
-            {
-                try
-                {
-                    var oldImageRelativePath = existingPostMeta.ImageUrl.Replace("/content/", "").Replace('/', Path.DirectorySeparatorChar);
-                    var oldImageFilePath = Path.Combine(_contentRootPath, oldImageRelativePath);
-                    if (File.Exists(oldImageFilePath))
-                    {
-                        File.Delete(oldImageFilePath);
-                        _logger.LogInformation($"Deleted old image (explicitly removed by user): {oldImageFilePath}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error deleting old image explicitly removed by user for post {originalSlug}.");
-                }
-                existingPostMeta.ImageUrl = null;
-            }
+            else if (request.ExplicitlyRemoveImage && existingPostMeta.ImageUrl != null)
+             {
+                 try
+                 {
+                     var oldImageRelativePath = existingPostMeta.ImageUrl.Replace("/content/", "").Replace('/', Path.DirectorySeparatorChar);
+                     var oldImageFilePath = Path.Combine(_contentRootPath, oldImageRelativePath);
+                     if (File.Exists(oldImageFilePath))
+                     {
+                         File.Delete(oldImageFilePath);
+                         _logger.LogInformation($"Deleted old image (explicitly removed by user): {oldImageFilePath}");
+                     }
+                 }
+                 catch (Exception ex)
+                 {
+                     _logger.LogError(ex, $"Error deleting old image explicitly removed by user for post {originalSlug}.");
+                 }
+                 existingPostMeta.ImageUrl = null;
+             }
+             
 
 
             try

@@ -26,6 +26,8 @@ namespace FileBlogSystem.Models
         public string? Base64Image { get; set; }
         public DateTime? PublishedDate { get; set; }
         public DateTime? ScheduledFor { get; set; }
+        public bool ExplicitlyRemoveImage { get; set; }
+
 
     }
 }

@@ -1,0 +1,22 @@
+{
+  "Id": "d85a525f-ba78-4249-a317-1c8ac947bfa9",
+  "Title": "new post",
+  "Description": "",
+  "CreationDate": "0001-01-01T00:00:00",
+  "PublishedDate": null,
+  "ModificationDate": "2025-07-30T17:43:49.414932Z",
+  "Tags": [
+    "e144a861-e956-46fa-b8f1-15170fb55044"
+  ],
+  "Categories": [
+    "2d003bab-8b65-4cda-9fab-2c9340f45b09"
+  ],
+  "CustomUrl": null,
+  "Slug": "new-post",
+  "isDraft": true,
+  "Content": "",
+  "ImageUrl": "/content/posts/2025-07-30-new-post/assets/71989442-b2d5-4bb7-99db-68f124a291b7.jpeg",
+  "AuthorUsername": "admin",
+  "ScheduledFor": null,
+  "LikedByUsers": []
+}
