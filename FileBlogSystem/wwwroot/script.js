@@ -2929,7 +2929,8 @@ async function loadPopularPosts() {
         <form id="edit-profile-form" class="profile-form">
           <div class="form-group">
             <label for="edit-username">Username</label>
-            <input type="text" id="edit-username" value="${user.username}" required readonly>
+            <input type="text" id="edit-username" value="${user.username} " required readonly>
+            <small class="form-text text-muted">Username cannot be changed.</small>
           </div>
           
           <div class="form-group">
@@ -2939,7 +2940,7 @@ async function loadPopularPosts() {
           
           <div class="form-group">
             <label for="edit-profile-picture">Profile Picture</label>
-            <input type="file" id="edit-profile-picture" accept="image/*">
+            <input type="file" id="edit-profile-picture" accept="image/*" value="${user.profilePictureUrl ? user.profilePictureUrl : ''}">
             <div class="current-picture" style="margin-top: 10px;">
               <img src="${
                 user.profilePictureUrl
@@ -3001,18 +3002,20 @@ async function loadPopularPosts() {
     form.addEventListener("submit", async (e) => {
       e.preventDefault()
 
-      const email = document.getElementById("edit-email").value
+      const useremail = document.getElementById("edit-email").value
       const profilePictureFile = document.getElementById("edit-profile-picture").files[0]
 
       try {
         const updateData = {
-          email: email,
+          email: useremail,
           roles: user.roles,
         }
 
-        if (profilePictureFile) {
+        if (profilePictureFile !== null) {
           updateData.profilePictureBase64 = await readFileAsBase64(profilePictureFile)
           updateData.profilePictureFileName = profilePictureFile.name
+        } else if (user.profilePictureUrl) {
+          updateData.profilePictureUrl = user.profilePictureUrl
         }
 
         const response = await fetchAuthenticated(`${API_BASE_URL}/api/update-user/${user.username}`, {

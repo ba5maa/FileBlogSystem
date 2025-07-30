@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using FileBlogSystem.Security;
 using Microsoft.AspNetCore.Hosting;
+using System.Runtime.InteropServices;
 
 namespace FileBlogSystem.Services
 {
