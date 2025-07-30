@@ -12,8 +12,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("config/site.json", optional: false, reloadOnChange: true);
 builder.Services.Configure<SiteConfiguration>(builder.Configuration); 
 builder.Services.AddSingleton<IFileContentService, FileContentService>();
-builder.Services.AddEndpointsApiExplorer(); 
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddImageSharp();
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -74,16 +76,28 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseImageSharp();
-
-app.UseDefaultFiles();
-app.UseStaticFiles();
-app.UseStaticFiles(new StaticFileOptions
+app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/content"), subApp =>
 {
-    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
-        Path.Combine(builder.Environment.ContentRootPath, "content")),
-    RequestPath = "/content"
+    subApp.UseImageSharp();
+
+    subApp.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
+            Path.Combine(builder.Environment.ContentRootPath, "content")),
+        RequestPath = "/content",
+        ServeUnknownFileTypes = true 
+    });
 });
+
+//app.UseDefaultFiles();
+app.UseStaticFiles();
+// app.UseStaticFiles(new StaticFileOptions
+// {
+//     FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
+//         Path.Combine(builder.Environment.ContentRootPath, "content")),
+//     RequestPath = "/content"
+// });
+
 
 app.UseAuthentication();
 app.UseAuthorization();

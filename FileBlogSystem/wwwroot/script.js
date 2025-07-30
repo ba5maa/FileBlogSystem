@@ -367,7 +367,12 @@ function convertMarkdownToHtml(markdownText) {
             
             <div class="blog-post-meta">
               <div class="blog-post-author">
-                <img src="${post.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}?width=400&height=250&mode=crop" class="author-avatar-large" alt="Author Avatar" />
+                <img src="${
+                   post.authorProfilePictureUrl
+                     ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(post.authorProfilePictureUrl.replace(/^\/content\//, ""))}&width=80&height=80`
+                     : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=80&height=80`
+                 }" class="author-avatar-large" alt="Author Avatar" />
+                 
                 <div class="author-info">
                   <span class="author-name">@${post.authorUsername}</span>
                   <span class="publish-date">${formatDate(post.publishedDate || post.creationDate)}</span>
@@ -595,7 +600,11 @@ function convertMarkdownToHtml(markdownText) {
       commentElement.innerHTML = `
         <div class="comment-header">
           <div class="comment-author">
-            <img src="${comment.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="avatar-img" alt="Avatar" />
+            <img src="${
+              comment.authorProfilePictureUrl
+                ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(comment.authorProfilePictureUrl.replace(/^\/content\//, ""))}&width=64&height=64`
+                : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=64&height=64`
+            }" class="avatar-img" alt="Avatar" />
             @${comment.username}
           </div>
           <div class="comment-date">${formatDate(comment.createdAt)}</div>
@@ -795,7 +804,7 @@ async function loadPopularPosts() {
         <div class="post-image-container">
           ${
             post.imageUrl
-              ? `<img src="${API_BASE_URL}${post.imageUrl}?width=400&height=250&mode=crop" alt="${post.title}">`
+              ? `<img src="${API_BASE_URL}/api/image?path=${encodeURIComponent(post.imageUrl.replace(/^\/content\//, ""))}&width=300&height=200" alt="${post.title}" />`
               : `<div class="post-image-placeholder">
                   <i class="fas fa-image"></i>
                 </div>`
@@ -816,7 +825,12 @@ async function loadPopularPosts() {
           
           <div class="post-footer">
             <div class="author-info">
-              <img src="${post.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" alt="Author Avatar" />
+              <img src="${
+                 post.authorProfilePictureUrl
+                   ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(post.authorProfilePictureUrl.replace(/^\/content\//, ""))}&width=64&height=64`
+                   : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=64&height=64`
+               }" alt="Author Avatar" />
+               
               <div>
                 <div class="author-username">@${post.authorUsername}</div>
                 <div class="post-date">${formatDate(post.publishedDate || post.creationDate)}</div>
@@ -1764,7 +1778,7 @@ async function loadPopularPosts() {
       <div class="post-image-container">
         ${
           post.imageUrl
-            ? `<img src="${API_BASE_URL}${post.imageUrl}?width=400&height=250&mode=crop" alt="${post.title}" class="post-image">`
+            ? `<img src="${API_BASE_URL}/api/image?path=${encodeURIComponent(post.imageUrl.replace(/^\/content\//, ""))}&width=300&height=200" alt="${post.title}" class="post-image">`
             : '<div class="post-image-placeholder"><i class="fas fa-image"></i></div>'
         }
       </div>
@@ -1799,8 +1813,11 @@ async function loadPopularPosts() {
         
         <div class="post-card-footer">
           <div class="post-author-info">
-            <img src="${post.authorProfilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" 
-                 class="post-author-avatar" alt="Author Avatar" />
+           <img src="${post.authorProfilePictureUrl 
+             ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(post.authorProfilePictureUrl.replace(/^\/content\//, ""))}&width=40&height=40`
+             : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=40&height=40`}" 
+     class="post-author-avatar" alt="Author Avatar" />
+
             <div class="post-author-details">
               <span class="post-author-name">@${post.authorUsername}</span>
               <span class="post-date">${formatDate(post.publishedDate || post.creationDate)}</span>
@@ -2306,7 +2323,7 @@ async function loadPopularPosts() {
               <input type="file" id="edit-post-image" accept="image/*">
               ${
                 postData.imageUrl
-                  ? `<img src="${API_BASE_URL}${postData.imageUrl}?width=400&height=250&mode=crop" alt="${postData.title || "Current Image"}" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px;">
+                  ? `<img src="${API_BASE_URL}${postData.imageUrl}" alt="${postData.title || "Current Image"}" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px;">
                    <button type="button" class="btn btn-sm btn-danger remove-image-btn" style="margin-top: 5px;">Remove Image</button>`
                   : ""
               }
@@ -2763,7 +2780,13 @@ async function loadPopularPosts() {
           <div class="profile-sidebar">
             <div class="profile-header">
               <div class="profile-avatar">
-                <img src="${user.profilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="profile-avatar-large" alt="Profile Avatar" />
+                <img src="${
+                  user.profilePictureUrl
+                    ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(user.profilePictureUrl.replace(/^\/content\//, ""))}&width=120&height=120`
+                    : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=120&height=120`
+                }" 
+                class="profile-avatar-large" alt="Profile Avatar" />
+                
               </div>
               <div class="profile-info">
                 <h2>@${user.username}</h2>
@@ -2858,9 +2881,14 @@ async function loadPopularPosts() {
             <label for="edit-profile-picture">Profile Picture</label>
             <input type="file" id="edit-profile-picture" accept="image/*">
             <div class="current-picture" style="margin-top: 10px;">
-              <img src="${user.profilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" 
-                   alt="Current Profile Picture" 
-                   class="profile-preview-img">
+              <img src="${
+                user.profilePictureUrl
+                  ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(user.profilePictureUrl.replace(/^\/content\//, ""))}&width=150&height=150`
+                  : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=150&height=150`
+              }" 
+              alt="Current Profile Picture" 
+              class="profile-preview-img" />
+              
             </div>
           </div>
           
@@ -3068,7 +3096,12 @@ async function loadPopularPosts() {
                </div>
                 <div class="nav-user">
                    <button class="profile-btn" id="profile-btn">
-                     <img src="${user.profilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" class="avatar-img" alt="Avatar" />
+                     <img src="${
+                        user.profilePictureUrl
+                          ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(user.profilePictureUrl.replace(/^\/content\//, ""))}&width=64&height=64`
+                          : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=64&height=64`
+                      }" class="avatar-img" alt="Avatar" />
+                      
                      <span style="color: #1a1a1a;">${user.username}</span>
                    </button>
                </div>
@@ -3223,8 +3256,13 @@ async function loadPopularPosts() {
         userCard.innerHTML = `
         <div class="user-card-header">
           <div class="user-avatar-section">
-            <img src="${user.profilePictureUrl || `${API_BASE_URL}/content/static/avatar.jpg`}" 
-                 class="user-admin-avatar" alt="User Avatar" />
+            <img src="${
+                user.profilePictureUrl
+                  ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(user.profilePictureUrl.replace(/^\/content\//, ""))}&width=48&height=48`
+                  : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=48&height=48`
+              }" 
+              class="user-admin-avatar" alt="User Avatar" />
+              
             <div class="user-basic-info">
               <h4 class="user-admin-name">@${user.username}</h4>
               <p class="user-admin-email">${user.email}</p>

@@ -614,6 +614,37 @@ namespace FileBlogSystem.Endpoints
             .Produces<CommentModel>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
             
+            app.MapGet("/api/image", async (HttpContext context, string path, int width, int height) =>
+            {
+                var env = context.RequestServices.GetRequiredService<IWebHostEnvironment>();
+            
+                var physicalPath = Path.Combine(env.ContentRootPath, "content", path.TrimStart('/'));
+            
+                if (!File.Exists(physicalPath))
+                    return Results.NotFound("Image not found.");
+            
+                try
+                {
+                    using var image = await Image.LoadAsync(physicalPath);
+            
+                    image.Mutate(x => x.Resize(new ResizeOptions
+                    {
+                        Size = new Size(width, height),
+                        Mode = ResizeMode.Crop
+                    }));
+            
+                    var ms = new MemoryStream();
+                    await image.SaveAsJpegAsync(ms);
+                    ms.Seek(0, SeekOrigin.Begin);
+            
+                    return Results.File(ms, "image/jpeg");
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem($"Failed to process image: {ex.Message}");
+                }
+            });
+
             return app;
         }
     }
