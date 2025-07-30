@@ -129,7 +129,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       user = JSON.parse(localStorage.getItem("user")) || null
       token = localStorage.getItem("token") || null
       tokenExpires = localStorage.getItem("tokenExpires") ? new Date(localStorage.getItem("tokenExpires")) : null
-      console.log("DEBUG just seeing user:", user)
 
       if (tokenExpires && tokenExpires <= new Date()) {
         console.warn("Token expired. Clearing authentication data.")
@@ -279,11 +278,6 @@ function convertMarkdownToHtml(markdownText) {
 }
 
  async function renderBlogPostPage(slug) {
-    // if (!isAuthenticated()) {
-    //   navigateTo("/welcome")
-    //   return
-    // }
-    console.log("DEBUG just seeing slug:", slug)
     currentPage = "blog-post"
     currentPostSlug = slug
     updateURL()
@@ -357,8 +351,6 @@ function convertMarkdownToHtml(markdownText) {
       const likeCount = post.likedByUsers?.length || 0
 
       document.title = `${post.title} - FileBlogSystem`
-
-      console.log("DEBUG just seeing blogmain:", blogMain)
 
       blogMain.innerHTML = `
         <article class="blog-post-article">
@@ -852,7 +844,6 @@ async function loadPopularPosts() {
       `;
       
       postCard.addEventListener("click", () => {
-        console.log("DEBUG just seeing post slug:", post.slug)
         if (post.slug) {
           currentPostSlug = post.slug;
           navigateTo(`/post/${post.slug}`);
@@ -1906,8 +1897,6 @@ async function loadPopularPosts() {
       queryParams.append("tag", selectedTag)
     }
     queryParams.append("IsDraft", "false")
-
-    console.log("Loading posts with params:", queryParams.toString())
 
     const url = `${API_BASE_URL}/api/posts?${queryParams.toString()}`
 
