@@ -279,7 +279,6 @@ function convertMarkdownToHtml(markdownText) {
 }
 
  async function renderBlogPostPage(slug) {
-  console.log("Rendering feed or admin:", currentPage)
     currentPage = "blog-post"
     currentPostSlug = slug
     updateURL()
