@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let tokenExpires = null
 
   let currentPage = "welcome"
+  let isInFeedPage = true
   let currentPostSlug = null
   let currentAdminSection = "posts"
   let base64Image = null;
@@ -278,6 +279,7 @@ function convertMarkdownToHtml(markdownText) {
 }
 
  async function renderBlogPostPage(slug) {
+  console.log("Rendering feed or admin:", currentPage)
     currentPage = "blog-post"
     currentPostSlug = slug
     updateURL()
@@ -287,7 +289,7 @@ function convertMarkdownToHtml(markdownText) {
         <div class="blog-post-header">
           <button class="back-btn" id="back-to-feed">
             <i class="fas fa-arrow-left"></i>
-            ${isAuthenticated() ? "Back to Feed" : "Back to loved blogs"}
+            ${isAuthenticated() ? isInFeedPage ? "Back to Feed" : "Back to admin panel" : "Back to loved blogs"}
           </button>
         </div>
         <div class="blog-post-layout">
@@ -325,7 +327,11 @@ function convertMarkdownToHtml(markdownText) {
     `
 
     document.getElementById("back-to-feed").addEventListener("click", () => {
-      navigateTo("/feed")
+     if(isInFeedPage) {
+        navigateTo("/feed")
+      } else {
+        navigateTo("/admin")
+      }
     })
 
     try {
@@ -1157,6 +1163,7 @@ async function loadPopularPosts() {
 
   async function renderDashboard() {
     currentPage = "feed"
+    isInFeedPage = true
     updateURL()
 
     document.title = "Feed - FileBlogSystem"
@@ -1361,7 +1368,7 @@ async function loadPopularPosts() {
 
                <div class="form-row" style="margin-top: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
               <div class="form-group">
-                <label for="create-post-image">Image</label>
+                <label for="create-post-image">Cover Image</label>
                 <input type="file" id="create-post-image" accept="image/*">
                 <img id="create-post-image-preview" src="#" alt="Preview" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px; display: none;">
                 <button type="button" class="btn btn-sm btn-danger" id="remove-create-image-btn" style="margin-top: 5px; display: none;">Remove Image</button>
@@ -1627,20 +1634,40 @@ async function loadPopularPosts() {
     const selectedTags = Array.from(document.getElementById("blog-tags").selectedOptions).map((option) => option.value)
     const messageElement = document.getElementById("blog-message")
 
+    document.querySelectorAll(".blog-error").forEach(el => el.remove())
+    document.querySelectorAll("#blog-title, #markdown-editor, #blog-category").forEach(input => {
+      input.style.borderColor = ""
+    })
+    
+    let hasError = false
+    
+    function showFieldError(fieldId, message) {
+      const field = document.getElementById(fieldId)
+      const errorDiv = document.createElement("div")
+      errorDiv.className = "blog-error"
+      errorDiv.style.color = "#dc3545"
+      errorDiv.style.fontSize = "12px"
+      errorDiv.style.marginTop = "4px"
+      errorDiv.textContent = message
+      field.style.borderColor = "#dc3545"
+      field.parentNode.appendChild(errorDiv)
+    }
+    
     if (!title) {
-      showMessage("Please enter a blog title", "error", messageElement)
-      return
+      showFieldError("blog-title", "Title is required.")
+      hasError = true
     }
-
     if (!content) {
-      showMessage("Please write some content", "error", messageElement)
-      return
+      showFieldError("markdown-editor", "Content is required.")
+      hasError = true
     }
-
     if (!categoryId) {
-      showMessage("Please select a category", "error", messageElement)
-      return
+      showFieldError("blog-category", "Category is required.")
+      hasError = true
     }
+    
+    if (hasError) return
+    
 
     let publishedDate = null
     let isDraft = true
@@ -1866,7 +1893,14 @@ async function loadPopularPosts() {
             </button>
             <button class="post-comment-btn" data-post-slug="${post.slug}">
               <i class="fas fa-comment"></i>
-              <span id="comment-count-${post.slug}">0</span>
+              <span id="comment-count-${post.slug}">
+                       ${fetchCommentsForPost(post.slug).then((comments) => {
+                        const commentCountSpan = postCard.querySelector(`#comment-count-${post.slug}`)
+                        if (commentCountSpan) {
+                          commentCountSpan.textContent = comments.length
+                        }
+              })}
+              </span>
             </button>
           </div>
         </div>
@@ -2352,7 +2386,7 @@ async function loadPopularPosts() {
           <div class="form-row" style="margin-top: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
             
             <div class="form-group">
-              <label for="edit-post-image">Image</label>
+              <label for="edit-post-image">Cover Image</label>
               <input type="file" id="edit-post-image" accept="image/*">
               ${
                 postData.imageUrl
@@ -3199,6 +3233,7 @@ async function loadPopularPosts() {
   }
 
   async function renderAdminPage() {
+    isInFeedPage = false
     if (!isAuthenticated() || !user.roles.includes("Admin")) {
       showMessage("You must be an admin to access this page.", "error", appContainer)
       navigateTo("/welcome")
