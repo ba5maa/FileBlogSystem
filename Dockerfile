@@ -6,5 +6,5 @@ RUN dotnet publish ./FileBlogSystem/FileBlogSystem.csproj -c Release -o out
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview
 WORKDIR /app
 COPY --from=build /app/out .
-EXPOSE 80
+EXPOSE 8080
 ENTRYPOINT ["dotnet", "FileBlogSystem.dll"]
