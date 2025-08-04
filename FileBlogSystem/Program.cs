@@ -9,7 +9,7 @@ using SixLabors.ImageSharp.Web.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.AddJsonFile("config/site.json", optional: true);
+builder.Configuration.AddJsonFile("Config/site.json", optional: true);
 builder.Services.Configure<SiteConfiguration>(builder.Configuration); 
 builder.Services.AddSingleton<IFileContentService, FileContentService>();
 builder.Services.AddEndpointsApiExplorer();
@@ -76,15 +76,15 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/content"), subApp =>
+app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/Content"), subApp =>
 {
     subApp.UseImageSharp();
 
     subApp.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
-            Path.Combine(builder.Environment.ContentRootPath, "content")),
-        RequestPath = "/content",
+            Path.Combine(builder.Environment.ContentRootPath, "Content")),
+        RequestPath = "/Content",
         ServeUnknownFileTypes = true 
     });
 });
