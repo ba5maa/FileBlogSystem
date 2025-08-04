@@ -9,7 +9,7 @@ using SixLabors.ImageSharp.Web.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.AddJsonFile("config/site.json", optional: false, reloadOnChange: true);
+builder.Configuration.AddJsonFile("config/site.json", optional: true);
 builder.Services.Configure<SiteConfiguration>(builder.Configuration); 
 builder.Services.AddSingleton<IFileContentService, FileContentService>();
 builder.Services.AddEndpointsApiExplorer();
