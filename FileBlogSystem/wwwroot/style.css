@@ -2756,7 +2756,7 @@ footer {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  color: #dc3545;
+  color:#666;;
   font-size: 0.85rem;
   font-weight: 600;
 }

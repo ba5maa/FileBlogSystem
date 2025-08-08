@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const appContainer = document.getElementById("app-container")
   const mainNav = document.getElementById("main-nav")
 
-  const API_BASE_URL = "http://localhost:5211"
+  const API_BASE_URL =  window.location.hostname === "localhost"? "http://localhost:5211" : window.location.origin
 
   let user = null
   let token = null
@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let currentPage = "welcome"
   let isInFeedPage = true
+  let isInDraftPage = false
   let currentPostSlug = null
   let currentAdminSection = "posts"
   let base64Image = null;
@@ -288,7 +289,7 @@ function convertMarkdownToHtml(markdownText) {
         <div class="blog-post-header">
           <button class="back-btn" id="back-to-feed">
             <i class="fas fa-arrow-left"></i>
-            ${isAuthenticated() ? isInFeedPage ? "Back to Feed" : "Back to admin panel" : "Back to loved blogs"}
+            ${isAuthenticated() ? isInFeedPage ? "Back to Feed" : isInDraftPage ? "Back to Drafts" : "Back to admin panel" : "Back to loved blogs"}
           </button>
         </div>
         <div class="blog-post-layout">
@@ -328,6 +329,8 @@ function convertMarkdownToHtml(markdownText) {
     document.getElementById("back-to-feed").addEventListener("click", () => {
      if(isInFeedPage) {
         navigateTo("/feed")
+      } else if (isInDraftPage) { 
+        navigateTo("/drafts")
       } else {
         navigateTo("/admin")
       }
@@ -835,7 +838,7 @@ async function loadPopularPosts() {
             </div>
             
             <div class="post-actions">
-              <div class="like-count">
+              <div class="like-count"">
                 <i class="fas fa-heart"></i>
                 <span>${likeCount}</span>
               </div>
@@ -1163,6 +1166,7 @@ async function loadPopularPosts() {
   async function renderDashboard() {
     currentPage = "feed"
     isInFeedPage = true
+    isInDraftPage = false
     updateURL()
 
     document.title = "Feed - FileBlogSystem"
@@ -2121,6 +2125,8 @@ async function loadPopularPosts() {
   }
 
   async function loadDrafts() {
+    isInDraftPage = true
+    isInFeedPage = false
     const draftsContainer = document.getElementById("drafts-container")
 
     draftsContainer.innerHTML = `
@@ -2194,6 +2200,7 @@ async function loadPopularPosts() {
         draftsContainer.appendChild(postCard)
       })
 
+      setupPostCardEventListeners(draftsContainer) 
       setupDraftEventListeners(draftsContainer)
     } catch (error) {
       draftsContainer.innerHTML = `
@@ -3002,6 +3009,27 @@ async function loadPopularPosts() {
     const deleteAccountBtn = document.querySelector(".delete-account-btn")
     const messageElement = document.getElementById("edit-profile-message")
 
+    function showFieldError(fieldId, message) {
+       const field = document.getElementById(fieldId);
+       const prev = field.parentNode.querySelector(".field-error");
+       if (prev) prev.remove();
+     
+       const err = document.createElement("div");
+       err.className = "field-error";
+       err.style.color = "#dc3545";
+       err.style.fontSize = "12px";
+       err.style.marginTop = "4px";
+       err.textContent = message;
+     
+       field.style.borderColor = "#dc3545";
+       field.parentNode.appendChild(err);
+     }
+     
+     function clearFieldErrors() {
+       document.querySelectorAll(".field-error").forEach(e => e.remove());
+       document.querySelectorAll("#edit-profile-form input").forEach(i => i.style.borderColor = "");
+     }
+
     deleteAccountBtn.addEventListener("click", async (e) => {
       e.preventDefault()
       const username = deleteAccountBtn.dataset.username
@@ -3032,8 +3060,24 @@ async function loadPopularPosts() {
       e.preventDefault()
 
       const useremail = document.getElementById("edit-email").value
-      const profilePictureFile = document.getElementById("edit-profile-picture").files[0]
-
+            const profilePictureFile = document.getElementById("edit-profile-picture").files[0]
+      
+            clearFieldErrors();
+      
+      const emailInput = document.getElementById("edit-email");
+      const email = emailInput.value.trim();
+      if (!email) {
+        showFieldError("edit-email", "Email is required");
+        return;
+      }
+      
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showFieldError("edit-email", "Please enter a valid email address");
+        return;
+      }
+    
+      
+      
       try {
         const updateData = {
           email: useremail,
@@ -3117,13 +3161,57 @@ async function loadPopularPosts() {
     const form = document.getElementById("change-password-form")
     const messageElement = document.getElementById("change-password-message")
 
+    function showFieldError(fieldId, message) {
+       const field = document.getElementById(fieldId);
+       const prev = field.parentNode.querySelector(".field-error");
+       if (prev) prev.remove();
+     
+       const err = document.createElement("div");
+       err.className = "field-error";
+       err.style.color = "#dc3545";
+       err.style.fontSize = "12px";
+       err.style.marginTop = "4px";
+       err.textContent = message;
+     
+       field.style.borderColor = "#dc3545";
+       field.parentNode.appendChild(err);
+     }
+     
+     function clearFieldErrors() {
+       document.querySelectorAll(".field-error").forEach(e => e.remove());
+       document
+         .querySelectorAll("#change-password-form input")
+         .forEach(i => (i.style.borderColor = ""));
+     }
+     
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault()
-
-      const currentPassword = document.getElementById("current-password").value
-      const newPassword = document.getElementById("new-password").value
-      const confirmNewPassword = document.getElementById("confirm-new-password").value
-
+      
+            clearFieldErrors();
+      showMessage("", "", messageElement);
+      const currentPasswordEl = document.getElementById("current-password");
+      const newPasswordEl = document.getElementById("new-password");
+      const confirmEl = document.getElementById("confirm-new-password");
+      
+      const currentPassword = currentPasswordEl.value;
+      const newPassword = newPasswordEl.value;
+      const confirmNewPassword = confirmEl.value;
+      
+      let hasError = false;
+      
+      if (!currentPassword) { showFieldError("current-password", "Current password is required"); hasError = true; }
+      if (!newPassword) { showFieldError("new-password", "New password is required"); hasError = true; }
+      if (!confirmNewPassword) { showFieldError("confirm-new-password", "Please confirm your new password"); hasError = true; }
+      
+      if (newPassword && confirmNewPassword && newPassword !== confirmNewPassword) {
+        showFieldError("confirm-new-password", "Passwords do not match");
+        hasError = true;
+      }
+      
+      if (hasError) return;
+      
+      
       if (newPassword !== confirmNewPassword) {
         showMessage("New passwords do not match", "error", messageElement)
         return
@@ -3160,6 +3248,9 @@ async function loadPopularPosts() {
         showMessage("Password changed successfully!", "success", messageElement)
         form.reset()
       } catch (error) {
+        if( error.message === "Current password is incorrect") {
+          showFieldError("current-password", "Current password is incorrect");
+        }
         showMessage(error.message, "error", messageElement)
       }
     })
@@ -3292,6 +3383,7 @@ async function loadPopularPosts() {
 
   async function loadAdminSection(section) {
     const adminContent = document.getElementById("admin-content")
+    isInDraftPage = false
 
     adminContent.innerHTML = `
       <div class="loading-posts">
@@ -3314,7 +3406,7 @@ async function loadPopularPosts() {
         await loadPostsAdmin()
         break
       default:
-        await loadUsersAdmin()
+        await loadPostsAdmin()
     }
   }
 
@@ -3696,6 +3788,9 @@ async function loadPopularPosts() {
             }
           })
         })
+
+        setupPostCardEventListeners(postsContainer);
+
       }
     } catch (error) {
       adminContent.innerHTML = `

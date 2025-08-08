@@ -10,7 +10,16 @@
 <body>
     <header>
         <div class="header-content">
-            <h1> File Blog System</h1>
+            <h1>
+                <a href="#" id="home-link" style="text-decoration: none; color: inherit;">File Blog System</a>
+            </h1>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    var isAuthorized = localStorage.getItem('token') !== null;
+                    var homeLink = document.getElementById('home-link');
+                    homeLink.setAttribute('href', isAuthorized ? '/feed' : '/welcome');
+                });
+            </script>
             <nav id="main-nav"></nav>
         </div>
     </header>

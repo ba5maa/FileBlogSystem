@@ -4,10 +4,16 @@
     <TargetFramework>net10.0</TargetFramework> <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <EnableDefaultContentItems>false</EnableDefaultContentItems> </PropertyGroup>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems> 
+    
+     <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+
+    </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="Content\**">
+    <Content Include="content\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="config\**">
