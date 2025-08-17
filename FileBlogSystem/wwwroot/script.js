@@ -358,7 +358,7 @@ function convertMarkdownToHtml(markdownText) {
       const isLikedByCurrentUser = post.likedByUsers?.includes(user?.username)
       const likeCount = post.likedByUsers?.length || 0
 
-      document.title = `${post.title} - FileBlogSystem`
+      document.title = `${post.title} - Daily Dots`
 
       blogMain.innerHTML = `
         <article class="blog-post-article">
@@ -462,7 +462,7 @@ function convertMarkdownToHtml(markdownText) {
           </button>
         </div>
       `
-      document.title = "FileBlogSystem"
+      document.title = "Daily Dots"
     }
   }
 
@@ -657,14 +657,14 @@ async function renderWelcomePage() {
   currentPage = "welcome";
   updateURL();
 
-  document.title = "Welcome to FileBlogSystem - Discover Amazing Stories";
+  document.title = "Welcome to Daily Dots - Discover Amazing Stories";
 
   appContainer.innerHTML = `
     <div class="welcome-page">
       <div class="welcome-hero">
         <div>
           <h1>
-            Welcome to FileBlogSystem
+            Welcome to Daily Dots
           </h1>
           <p>
             Discover amazing stories, share your thoughts, and connect with a community of passionate writers and readers.
@@ -882,7 +882,7 @@ async function loadPopularPosts() {
     currentPage = type
     updateURL()
 
-    document.title = type === "login" ? "Login - FileBlogSystem" : "Sign Up - FileBlogSystem"
+    document.title = type === "login" ? "Login - Daily Dots" : "Sign Up - Daily Dots"
 
     appContainer.innerHTML = `
             <div class="auth-container">
@@ -1169,7 +1169,7 @@ async function loadPopularPosts() {
     isInDraftPage = false
     updateURL()
 
-    document.title = "Feed - FileBlogSystem"
+    document.title = "Feed - Daily Dots"
 
     appContainer.innerHTML = `
             <div class="dashboard">
@@ -1199,7 +1199,7 @@ async function loadPopularPosts() {
                         </div>
                         <button class="create-blog-btn" id="create-blog-btn">
                             <i class="fas fa-plus"></i>
-                            Create Blog
+                            Create Blog Post
                         </button>
                     </div>
                 </div>
@@ -1233,7 +1233,7 @@ async function loadPopularPosts() {
     currentPage = "create-blog"
     updateURL()
 
-    document.title = "Create Blog - FileBlogSystem"
+    document.title = "Create Blog Post - Daily Dots"
 
     appContainer.innerHTML = `
         <div class="create-blog-page">
@@ -2103,7 +2103,7 @@ async function loadPopularPosts() {
     currentPage = "drafts"
     updateURL()
 
-    document.title = "My Drafts & Posts - FileBlogSystem"
+    document.title = "My Drafts & Posts - Daily Dots"
 
     appContainer.innerHTML = `
       <div class="drafts-page">
@@ -2269,7 +2269,7 @@ async function loadPopularPosts() {
       publishedTimeValue = dateObj.toTimeString().substring(0, 5)
     }
 
-    document.title = `Edit: ${postData.title} - FileBlogSystem`
+    document.title = `Edit: ${postData.title} - Daily Dots`
 
     appContainer.innerHTML = `
       <div class="create-blog-page">
@@ -2868,7 +2868,7 @@ async function loadPopularPosts() {
     currentPage = "profile"
     updateURL()
 
-    document.title = "Profile - FileBlogSystem"
+    document.title = "Profile - Daily Dots"
 
     appContainer.innerHTML = `
       <div class="profile-page">
@@ -3333,7 +3333,7 @@ async function loadPopularPosts() {
     currentPage = "admin"
     updateURL()
 
-    document.title = "Admin Panel - FileBlogSystem"
+    document.title = "Admin Panel - Daily Dots"
 
     appContainer.innerHTML = `
     <div class="admin-page">
