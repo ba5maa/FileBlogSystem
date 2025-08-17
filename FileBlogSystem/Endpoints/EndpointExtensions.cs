@@ -139,6 +139,7 @@ namespace FileBlogSystem.Endpoints
                     postMeta.Categories,
                     postMeta.CustomUrl,
                     postMeta.ImageUrl,
+                    postMeta.ScheduledFor,
                     postMeta.Slug,
                     Content = content,
                     postMeta.LikedByUsers,

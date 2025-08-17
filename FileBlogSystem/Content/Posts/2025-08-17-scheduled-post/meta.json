@@ -1,0 +1,22 @@
+{
+  "Id": "a097bf5c-517e-4c1d-9da5-e1fedb4ab959",
+  "Title": "scheduled post",
+  "Description": "",
+  "CreationDate": "0001-01-01T00:00:00",
+  "PublishedDate": null,
+  "ModificationDate": "2025-08-17T17:22:39.6361024Z",
+  "Tags": [
+    "3b53d125-b543-4931-99bd-4d16d3a83fb6"
+  ],
+  "Categories": [
+    "84b73196-d5de-4896-8231-a540fb1e5b16"
+  ],
+  "CustomUrl": null,
+  "Slug": "scheduled-post",
+  "isDraft": true,
+  "Content": "",
+  "ImageUrl": null,
+  "AuthorUsername": "admin",
+  "ScheduledFor": "2025-08-18T17:22:00Z",
+  "LikedByUsers": []
+}

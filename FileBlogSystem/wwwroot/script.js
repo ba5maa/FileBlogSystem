@@ -1885,7 +1885,11 @@ async function loadPopularPosts() {
 
             <div class="post-author-details">
               <span class="post-author-name">@${post.authorUsername}</span>
-              <span class="post-date">${formatDate(post.publishedDate || post.creationDate)}</span>
+              <div class="post-date">${
+                post.isDraft && post.scheduledFor
+                  ? `Scheduled: ${formatDateTime(post.scheduledFor)}`
+                  : formatDate(post.publishedDate || post.creationDate)
+              }</div>
             </div>
           </div>
           
@@ -2827,6 +2831,12 @@ async function loadPopularPosts() {
       day: "numeric",
     })
   }
+
+  function formatDateTime(dateString) {
+  if (!dateString) return "N/A";
+  const d = new Date(dateString);
+  return d.toLocaleString();
+}
 
   async function cancelPostSchedule(postSlug) {
     try {
