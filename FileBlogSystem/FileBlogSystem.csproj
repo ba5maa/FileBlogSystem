@@ -7,8 +7,7 @@
     <EnableDefaultContentItems>false</EnableDefaultContentItems> 
     
      <SelfContained>false</SelfContained>
-    <RuntimeIdentifier>false</RuntimeIdentifier>
-    <PublishSingleFile></PublishSingleFile>
+    <PublishSingleFile>false</PublishSingleFile>
 
     </PropertyGroup>
 
