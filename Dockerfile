@@ -12,6 +12,8 @@ WORKDIR /app
 COPY --from=build /app/out ./
 COPY FileBlogSystem/Content /app/content
 COPY FileBlogSystem/Config /app/config
+COPY FileBlogSystem/wwwroot /app/wwwroot
+
 
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "FileBlogSystem.dll"]
