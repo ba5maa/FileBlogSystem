@@ -7,12 +7,7 @@ using System.Text;
 using Microsoft.OpenApi.Models;
 using SixLabors.ImageSharp.Web.DependencyInjection;
 
-// Create builder with explicit web root
-var builder = WebApplication.CreateBuilder(new WebApplicationOptions
-{
-    ContentRootPath = AppContext.BaseDirectory, // /app in Docker
-    WebRootPath = "Content"
-});
+
 
 // Load configuration
 builder.Configuration.AddJsonFile("Config/site.json", optional: true);
