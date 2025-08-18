@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
 WORKDIR /app
 COPY . .
 
-RUN dotnet publish ./FileBlogSystem/FileBlogSystem.csproj -c Release -o out -r linux-x64 --self-contained false
+RUN dotnet publish ./FileBlogSystem/FileBlogSystem.csproj -c Release -o /app/out --no-self-contained
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview
 WORKDIR /app
