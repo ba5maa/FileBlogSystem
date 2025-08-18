@@ -6,9 +6,9 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <EnableDefaultContentItems>false</EnableDefaultContentItems> 
     
-     <SelfContained>true</SelfContained>
-    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
-    <PublishSingleFile>true</PublishSingleFile>
+     <SelfContained>false</SelfContained>
+    <RuntimeIdentifier>false</RuntimeIdentifier>
+    <PublishSingleFile></PublishSingleFile>
 
     </PropertyGroup>
 
