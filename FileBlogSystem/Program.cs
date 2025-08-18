@@ -128,6 +128,6 @@ app.UseAuthorization();
 app.MapApiEndpoints();
 
 // Fallback for frontend routing
-app.MapFallbackToFile("{*path:nonfile}", "index.html");
+app.MapFallbackToFile("/Content/index.html");
 
 app.Run();
