@@ -1,0 +1,10 @@
+replicaCount: 2
+image:
+  repository: registry.arc-center.run/silverkeytech/fileblogsystem/basma
+  pullPolicy: IfNotPresent
+  tag: basma-fileblogsystem-dev-latest
+
+resources:
+  requests:
+    cpu: 60m
+    memory: 60M
