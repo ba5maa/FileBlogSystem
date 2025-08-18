@@ -9,13 +9,18 @@ using SixLabors.ImageSharp.Web.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.AddJsonFile("config/site.json", optional: true);
+// Load configuration
+builder.Configuration.AddJsonFile("Config/site.json", optional: true);
 builder.Services.Configure<SiteConfiguration>(builder.Configuration); 
+
+// Register services
 builder.Services.AddSingleton<IFileContentService, FileContentService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddImageSharp();
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
+
+// Swagger
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -43,15 +48,15 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+// Lucene search service
 builder.Services.AddSingleton<ILuceneSearchService>(sp =>
 {
     var env = sp.GetRequiredService<IWebHostEnvironment>();
     var files = sp.GetRequiredService<IFileContentService>();
-    // set useArabic: true to switch to ArabicAnalyzer
     return new LuceneSearchService(env, files, useArabic: false);
 });
 
-
+// JWT authentication
 var jwtSecret = builder.Configuration["Jwt:Key"] ?? Guid.NewGuid().ToString();
 var issuer = builder.Configuration["Jwt:Issuer"] ?? "FileBlogSystem";
 var audience = builder.Configuration["Jwt:Audience"] ?? "FileBlogSystemUsers";
@@ -78,6 +83,7 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+// Development tools
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -85,40 +91,38 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/content"), subApp =>
+// Serve static content from /Content
+app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/Content"), subApp =>
 {
     subApp.UseImageSharp();
 
     subApp.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
-            Path.Combine(builder.Environment.ContentRootPath, "content")),
-        RequestPath = "/content",
+            Path.Combine(builder.Environment.ContentRootPath, "Content")),
+        RequestPath = "/Content",
         ServeUnknownFileTypes = true
     });
 });
 
+// Rebuild Lucene index
 using (var scope = app.Services.CreateScope())
 {
     await scope.ServiceProvider.GetRequiredService<ILuceneSearchService>()
          .RebuildIndexAsync();
 }
 
-//app.UseDefaultFiles();
+// Default static files
 app.UseStaticFiles();
-// app.UseStaticFiles(new StaticFileOptions
-// {
-//     FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
-//         Path.Combine(builder.Environment.ContentRootPath, "content")),
-//     RequestPath = "/content"
-// });
 
-
+// Authentication & authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
+// API endpoints
 app.MapApiEndpoints();
 
+// Fallback for frontend routing
 app.MapFallbackToFile("{*path:nonfile}", "index.html");
 
 app.Run();
