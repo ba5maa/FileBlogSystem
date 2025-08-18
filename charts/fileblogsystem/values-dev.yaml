@@ -2,4 +2,4 @@ replicaCount: 1
 image:
   repository: registry.arc-center.run/silverkeytech/fileblogsystem/basma
   pullPolicy: IfNotPresent
-  tag: f07f52
+  tag: f52702
