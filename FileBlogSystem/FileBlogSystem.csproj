@@ -12,10 +12,10 @@
     </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="content\**">
+    <Content Include="content/**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="config\**">
+    <Content Include="config/**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
