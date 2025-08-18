@@ -7,6 +7,10 @@ using System.Security.Claims;
 using FileBlogSystem.Security;
 using Microsoft.AspNetCore.Mvc;
 using FileBlogSystem.Constants;
+using static System.Net.Mime.MediaTypeNames;
+using ImgSharpImage = SixLabors.ImageSharp.Image;
+using SixLabors.ImageSharp;             
+using SixLabors.ImageSharp.Processing; 
 
 namespace FileBlogSystem.Endpoints
 {
@@ -635,30 +639,30 @@ namespace FileBlogSystem.Endpoints
             .WithName(EndpointConstants.AddComment)
             .Produces<CommentModel>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
-            
-            app.MapGet("/api/image", async (HttpContext context, string path, int width, int height) =>
+
+            _ = app.MapGet("/api/image", async (HttpContext context, string path, int width, int height) =>
             {
                 var env = context.RequestServices.GetRequiredService<IWebHostEnvironment>();
-            
+
                 var physicalPath = Path.Combine(env.ContentRootPath, "content", path.TrimStart('/'));
-            
+
                 if (!File.Exists(physicalPath))
                     return Results.NotFound("Image not found.");
-            
+
                 try
                 {
-                    using var image = await Image.LoadAsync(physicalPath);
-            
+                    using ImgSharpImage image = await ImgSharpImage.LoadAsync(physicalPath);
+
                     image.Mutate(x => x.Resize(new ResizeOptions
                     {
                         Size = new Size(width, height),
                         Mode = ResizeMode.Crop
                     }));
-            
+
                     var ms = new MemoryStream();
                     await image.SaveAsJpegAsync(ms);
                     ms.Seek(0, SeekOrigin.Begin);
-            
+
                     return Results.File(ms, "image/jpeg");
                 }
                 catch (Exception ex)
