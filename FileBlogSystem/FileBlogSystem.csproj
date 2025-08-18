@@ -7,7 +7,7 @@
     <EnableDefaultContentItems>false</EnableDefaultContentItems> 
     
      <SelfContained>true</SelfContained>
-    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
     <PublishSingleFile>true</PublishSingleFile>
 
     </PropertyGroup>
