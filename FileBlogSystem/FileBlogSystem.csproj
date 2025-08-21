@@ -6,17 +6,16 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <EnableDefaultContentItems>false</EnableDefaultContentItems> 
     
-     <SelfContained>true</SelfContained>
-    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
-    <PublishSingleFile>true</PublishSingleFile>
+     <SelfContained>false</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
 
     </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="content\**">
+    <Content Include="Content\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="config\**">
+    <Content Include="Config\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
