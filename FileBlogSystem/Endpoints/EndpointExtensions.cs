@@ -44,35 +44,27 @@ namespace FileBlogSystem.Endpoints
                     filteredPosts = filteredPosts.Where(p => p.AuthorUsername.ToLower() == authorUsername.ToLower());
                 }
 
-                //  if (!string.IsNullOrEmpty(searchTerm))
-                //  {
-                //      var lowerSearchTerm = searchTerm.ToLowerInvariant();
-                //      filteredPosts = filteredPosts.ToList().Where(p =>
-                //      (p.Title?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false) ||
-                //      (p.Description?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false) ||
-                //      (p.Content?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false) ||
-                //      (p.AuthorUsername?.ToLowerInvariant().Contains(lowerSearchTerm) ?? false))
-                //      .AsQueryable();
-                //  }
-
                 if (!string.IsNullOrEmpty(tag) && Guid.TryParse(tag, out Guid tagId))
                 {
                     filteredPosts = filteredPosts.Where(p => p.Tags != null && p.Tags.Contains(tagId));
                 }
                 
                  if (!string.IsNullOrWhiteSpace(searchTerm))
-                  {
-                    Console.WriteLine($"before search.searchSlugsAsync: {searchTerm}");
-                      var slugs = await search.SearchSlugsAsync(searchTerm, limit: 100);
-                      Console.WriteLine($"after search.searchSlugsAsync: {searchTerm}");
-                      var slugSet = new HashSet<string>(slugs, StringComparer.OrdinalIgnoreCase);
-                      filteredPosts = filteredPosts.Where(p => p.Slug != null && slugSet.Contains(p.Slug));
-                      var bySlugOrder = slugs.Select((s, i) => (s, i)).ToDictionary(x => x.s, x => x.i, StringComparer.OrdinalIgnoreCase);
-                      filteredPosts = filteredPosts.OrderBy(p =>
-                        p.Slug != null && bySlugOrder.ContainsKey(p.Slug)
-                            ? bySlugOrder[p.Slug]
-                            : int.MaxValue);
-                  }
+                 {
+                     searchTerm = searchTerm.Trim();
+                 
+                     var slugs = await search.SearchSlugsAsync(searchTerm, limit: 100);
+                     var slugSet = new HashSet<string>(slugs, StringComparer.OrdinalIgnoreCase);
+                 
+                     filteredPosts = filteredPosts.Where(p => p.Slug != null && slugSet.Contains(p.Slug));
+                 
+                     var bySlugOrder = slugs.Select((s, i) => (s, i))
+                                            .ToDictionary(x => x.s, x => x.i, StringComparer.OrdinalIgnoreCase);
+                 
+                     filteredPosts = filteredPosts.OrderBy(p =>
+                         p.Slug != null && bySlugOrder.ContainsKey(p.Slug) ? bySlugOrder[p.Slug] : int.MaxValue);
+                 }
+                 
              
 
                 foreach (var meta in filteredPosts)

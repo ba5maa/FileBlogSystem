@@ -8,7 +8,10 @@ using Lucene.Net.QueryParsers.Classic;
 using Lucene.Net.Search;
 using Lucene.Net.Store;
 using Lucene.Net.Util;
-using IO = System.IO;   
+using IO = System.IO;  
+using Lucene.Net.Analysis.TokenAttributes;
+using Lucene.Net.Search.Spans;
+using Lucene.Net.Queries.Function;
 
 
 public sealed class LuceneSearchService : ILuceneSearchService, IDisposable
@@ -64,7 +67,7 @@ public sealed class LuceneSearchService : ILuceneSearchService, IDisposable
         {
             new StringField("slug", meta.Slug ?? string.Empty, Field.Store.YES),
             new StringField("id", meta.Id.ToString(), Field.Store.YES),
-            new StringField("author", meta.AuthorUsername ?? string.Empty, Field.Store.YES),
+            new TextField("author", meta.AuthorUsername ?? string.Empty, Field.Store.YES),
 
             new TextField("title", meta.Title ?? string.Empty, Field.Store.YES),
             new TextField("description", meta.Description ?? string.Empty, Field.Store.YES),
@@ -92,38 +95,69 @@ public sealed class LuceneSearchService : ILuceneSearchService, IDisposable
         }
         return Task.CompletedTask;
     }
+
+
 public Task<IReadOnlyList<string>> SearchSlugsAsync(string query, int limit = 50, CancellationToken ct = default)
 {
     if (string.IsNullOrWhiteSpace(query))
         return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
 
-    var qtxt = QueryParserBase.Escape(query.Trim()); 
-    qtxt = System.Text.RegularExpressions.Regex.Replace(qtxt, @"\s+", " ");
+    var tokens = AnalyzeTerms(_analyzer, "content", query);
+    if (tokens.Count == 0)
+        return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
 
     using var reader = DirectoryReader.Open(_dir);
     var searcher = new IndexSearcher(reader);
 
-    var fields = new[] { "title", "description", "content", "author" };
-    var boosts = new Dictionary<string, float> { ["title"] = 3f, ["description"] = 1.5f, ["content"] = 1f, ["author"] = 1f };
-    var parser = new MultiFieldQueryParser(AppLuceneVersion, fields, _analyzer, boosts)
-    {
-        DefaultOperator = Operator.AND 
+    var fieldsWithBoosts = new (string field, float boost)[] {
+        ("title", 3f),
+        ("description", 3f),
+        ("content", 3f),
+        ("author", 3f)
     };
 
-    Query q;
-    try
+    var mustAllTerms = new BooleanQuery();
+
+    foreach (var t in tokens)
     {
-        q = parser.Parse(qtxt);
-    }
-    catch (ParseException)
-    {
-        var bq = new BooleanQuery();
-        foreach (var f in fields)
-            bq.Add(new TermQuery(new Term(f, qtxt)), Occur.SHOULD);
-        q = bq;
+        var anyField = new BooleanQuery { MinimumNumberShouldMatch = 1 };
+
+        foreach (var (field, boost) in fieldsWithBoosts)
+        {
+            var tq = new TermQuery(new Term(field, t));
+            if (boost != 1f) tq.Boost = boost;
+            anyField.Add(tq, Occur.SHOULD);
+        }
+
+        mustAllTerms.MinimumNumberShouldMatch = 1;
     }
 
-    var hits = searcher.Search(q, limit);
+    if (tokens.Count >= 2)
+    {
+        var titlePhrase = new PhraseQuery { Slop = 1 };
+        foreach (var tok in tokens) titlePhrase.Add(new Term("title", tok));
+        titlePhrase.Boost = 4f; 
+        mustAllTerms.Add(titlePhrase, Occur.SHOULD);
+
+        var contentPhrase = new PhraseQuery { Slop = 3 };
+        foreach (var tok in tokens) contentPhrase.Add(new Term("content", tok));
+        contentPhrase.Boost = 1.5f;
+        mustAllTerms.Add(contentPhrase, Occur.SHOULD);
+    }
+
+    foreach (var t in tokens.Where(x => x.Length >= 3))
+    {
+        var anyFieldPrefix = new BooleanQuery { MinimumNumberShouldMatch = 1 };
+        foreach (var (field, boost) in fieldsWithBoosts)
+        {
+            var pq = new PrefixQuery(new Term(field, t));
+            pq.Boost = 0.4f * boost;
+            anyFieldPrefix.Add(pq, Occur.SHOULD);
+        }
+        mustAllTerms.Add(anyFieldPrefix, Occur.SHOULD);
+    }
+
+    var hits = searcher.Search(mustAllTerms, limit);
     var slugs = new List<string>(Math.Min(limit, hits.ScoreDocs.Length));
     foreach (var sd in hits.ScoreDocs)
     {
@@ -131,6 +165,18 @@ public Task<IReadOnlyList<string>> SearchSlugsAsync(string query, int limit = 50
         slugs.Add(doc.Get("slug"));
     }
     return Task.FromResult<IReadOnlyList<string>>(slugs);
+}
+
+private static List<string> AnalyzeTerms(Analyzer analyzer, string field, string text)
+{
+    var results = new List<string>();
+    using var reader = new System.IO.StringReader(text);
+    using var ts = analyzer.GetTokenStream(field, reader);
+    var termAttr = ts.AddAttribute<ICharTermAttribute>();
+    ts.Reset();
+    while (ts.IncrementToken()) results.Add(termAttr.ToString());
+    ts.End();
+    return results;
 }
 
     public void Dispose()
