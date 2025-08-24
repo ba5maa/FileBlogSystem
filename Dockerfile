@@ -1,10 +1,18 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS base
 WORKDIR /app
-COPY . .
-RUN dotnet publish ./FileBlogSystem/FileBlogSystem.csproj -c Release -o out
-
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview
-WORKDIR /app
-COPY --from=build /app/out .
 EXPOSE 8080
-ENTRYPOINT ["dotnet", "FileBlogSystem.dll"]
+ENV ASPNETCORE_URLS=http://+:8080
+
+# Stage 1: Build the application
+FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
+WORKDIR /src
+COPY ["FileBasedBlog.csproj", "./"]
+RUN dotnet restore "./FileBasedBlog/FileBasedBlog.csproj"
+COPY . .
+RUN dotnet publish "./FileBasedBlog/FileBasedBlog.csproj" -c Release -o /app/publish
+
+
+FROM base AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "FileBasedBlog.dll"]
