@@ -92,7 +92,7 @@ app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/content"), subApp =>
     subApp.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
-            Path.Combine(builder.Environment.ContentRootPath, "content")),
+            Path.Combine(builder.Environment.ContentRootPath, "Content")),
         RequestPath = "/content",
         ServeUnknownFileTypes = true
     });
