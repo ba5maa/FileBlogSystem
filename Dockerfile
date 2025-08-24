@@ -18,7 +18,7 @@ COPY . .
 
 # Build and publish
 WORKDIR "/src/FileBlogSystem"
-RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish -c Release -o /app/publish
 
 # Final runtime image
 FROM base AS final
