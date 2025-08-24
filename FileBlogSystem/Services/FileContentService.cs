@@ -21,7 +21,7 @@ namespace FileBlogSystem.Services
 
         public FileContentService(IWebHostEnvironment env, ILogger<FileContentService> logger)
         {
-            _contentRootPath = Path.Combine(env.ContentRootPath, "content");
+            _contentRootPath = Path.Combine(env.ContentRootPath, "Content");
             _logger = logger;
             _postsFolderPath = Path.Combine(_contentRootPath, "posts");
             _categoriesFolderPath = Path.Combine(_contentRootPath, "categories");
@@ -67,7 +67,7 @@ namespace FileBlogSystem.Services
                 if (imageFiles.Any())
                 {
                     var fileName = Path.GetFileName(imageFiles.First());
-                    return $"/content/users/{username.ToLowerInvariant()}/profilepicture/{fileName}";
+                    return $"/Content/users/{username.ToLowerInvariant()}/profilepicture/{fileName}";
                 }
             }
             return null;
@@ -308,7 +308,7 @@ namespace FileBlogSystem.Services
                     var imageFileName = await SaveBase64ImageAsync(postFolderPath, request.Base64Image);
                     if (imageFileName != null)
                     {
-                        newPostMeta.ImageUrl = $"/content/posts/{postFolderName}/assets/{imageFileName}";
+                        newPostMeta.ImageUrl = $"/Content/posts/{postFolderName}/assets/{imageFileName}";
                     }
                 }
 
@@ -446,7 +446,7 @@ namespace FileBlogSystem.Services
                     try
                     {
 
-                        var oldImageRelativePath = existingPostMeta.ImageUrl.Replace("/content/", "").Replace('/', Path.DirectorySeparatorChar);
+                        var oldImageRelativePath = existingPostMeta.ImageUrl.Replace("/Content/", "").Replace('/', Path.DirectorySeparatorChar);
                         var oldImageFilePath = Path.Combine(_contentRootPath, oldImageRelativePath);
 
                         if (File.Exists(oldImageFilePath))
@@ -464,14 +464,14 @@ namespace FileBlogSystem.Services
                 var imageFileName = await SaveBase64ImageAsync(newPostFolderPath, request.Base64Image);
                 if (imageFileName != null)
                 {
-                    existingPostMeta.ImageUrl = $"/content/posts/{newPostFolderName}/assets/{imageFileName}";
+                    existingPostMeta.ImageUrl = $"/Content/posts/{newPostFolderName}/assets/{imageFileName}";
                 }
             }
             else if (request.ExplicitlyRemoveImage && existingPostMeta.ImageUrl != null)
              {
                  try
                  {
-                     var oldImageRelativePath = existingPostMeta.ImageUrl.Replace("/content/", "").Replace('/', Path.DirectorySeparatorChar);
+                     var oldImageRelativePath = existingPostMeta.ImageUrl.Replace("/Content/", "").Replace('/', Path.DirectorySeparatorChar);
                      var oldImageFilePath = Path.Combine(_contentRootPath, oldImageRelativePath);
                      if (File.Exists(oldImageFilePath))
                      {

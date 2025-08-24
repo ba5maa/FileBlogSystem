@@ -85,7 +85,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/content"), subApp =>
+app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/Content"), subApp =>
 {
     subApp.UseImageSharp();
 
@@ -93,7 +93,7 @@ app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/content"), subApp =>
     {
         FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(
             Path.Combine(builder.Environment.ContentRootPath, "Content")),
-        RequestPath = "/content",
+        RequestPath = "/Content",
         ServeUnknownFileTypes = true
     });
 });

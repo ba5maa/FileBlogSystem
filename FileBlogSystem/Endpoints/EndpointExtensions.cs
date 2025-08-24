@@ -690,7 +690,7 @@ namespace FileBlogSystem.Endpoints
                  using var stream = new FileStream(fullPath, FileMode.Create);
                  await file.CopyToAsync(stream);
              
-                 var relativeUrl = $"/content/posts/{postFolderName}/assets/{fileName}";
+                 var relativeUrl = $"/Content/posts/{postFolderName}/assets/{fileName}";
                  return Results.Ok(new { imageUrl = relativeUrl });
              });
              
