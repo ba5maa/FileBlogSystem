@@ -6,12 +6,21 @@ ENV ASPNETCORE_URLS=http://+:8080
 # Stage 1: Build the application
 FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
 WORKDIR /src
-COPY ["FileBlogSystem/FileBlogSystem.csproj", "/FileBlogSystem"]
-RUN dotnet restore "./FileBlogSystem/FileBlogSystem..csproj"
+
+# Copy only the project file first (keep folder structure)
+COPY ["FileBlogSystem/FileBlogSystem.csproj", "FileBlogSystem/"]
+
+# Restore dependencies
+RUN dotnet restore "FileBlogSystem/FileBlogSystem.csproj"
+
+# Copy the rest of the source code
 COPY . .
-RUN dotnet publish "./FileBlogSystem/FileBlogSystem.csproj" -c Release -o /app/publish
 
+# Build and publish
+WORKDIR "/src/FileBlogSystem"
+RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 
+# Final runtime image
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
