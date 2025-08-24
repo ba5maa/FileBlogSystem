@@ -7,9 +7,9 @@ ENV ASPNETCORE_URLS=http://+:8080
 FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
 WORKDIR /src
 COPY ["FileBasedBlog.csproj", "./"]
-RUN dotnet restore "./FileBasedBlog.csproj"
+RUN dotnet restore "./FileBasedBlog/FileBasedBlog.csproj"
 COPY . .
-RUN dotnet publish "./FileBasedBlog.csproj" -c Release -o /app/publish
+RUN dotnet publish "./FileBasedBlog/FileBasedBlog.csproj" -c Release -o /app/publish
 
 
 FROM base AS final
