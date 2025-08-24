@@ -1,0 +1,5 @@
+replicaCount: 1
+image:
+  repository: registry.arc-center.run/silverkeytech/fileblogsystem/ba5ma
+  pullPolicy: IfNotPresent
+  tag: ba5ma-fileblogsystem-dev-latest
