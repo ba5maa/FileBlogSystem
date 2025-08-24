@@ -10,7 +10,7 @@ COPY FileBlogSystem/. ./
 #COPY FileBlogSystem/wwwroot ./wwwroot
 RUN dotnet publish -c Release -o /app/publish /p:SelfContained=false
 # Runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS final 
 WORKDIR /app
 COPY --from=build /app/publish .
 COPY FileBlogSystem/Content ./Content
