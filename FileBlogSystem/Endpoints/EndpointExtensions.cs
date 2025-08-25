@@ -643,15 +643,25 @@ namespace FileBlogSystem.Endpoints
             _ = app.MapGet("/api/image", async (HttpContext context, string path, int width, int height) =>
             {
                 var env = context.RequestServices.GetRequiredService<IWebHostEnvironment>();
+                
+                // Normalize path by removing leading slash and any content prefix
+                var normalizedPath = path.TrimStart('/');
+                if (normalizedPath.StartsWith("Content/", StringComparison.OrdinalIgnoreCase))
+                {
+                    normalizedPath = normalizedPath.Substring(8);
+                }
 
-                var physicalPath = Path.Combine(env.ContentRootPath, "content", path.TrimStart('/'));
-
-                if (!File.Exists(physicalPath))
-                    return Results.NotFound("Image not found.");
+                // Always look under the Content directory
+                var fullPath = Path.Combine(env.ContentRootPath, "Content", normalizedPath);
+                
+                if (!File.Exists(fullPath))
+                {
+                    return Results.NotFound($"Image not found at {fullPath}");
+                }
 
                 try
                 {
-                    using ImgSharpImage image = await ImgSharpImage.LoadAsync(physicalPath);
+                    using ImgSharpImage image = await ImgSharpImage.LoadAsync(fullPath);
 
                     image.Mutate(x => x.Resize(new ResizeOptions
                     {
@@ -675,7 +685,7 @@ namespace FileBlogSystem.Endpoints
              {
                  var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
                  var postFolderName = $"{today}-{slug}";
-                 var postFolderPath = Path.Combine("content", "posts", postFolderName);
+                 var postFolderPath = Path.Combine("Content", "Posts", postFolderName);
              
                  var assetsPath = Path.Combine(postFolderPath, "assets");
                  Directory.CreateDirectory(assetsPath); 
@@ -690,7 +700,7 @@ namespace FileBlogSystem.Endpoints
                  using var stream = new FileStream(fullPath, FileMode.Create);
                  await file.CopyToAsync(stream);
              
-                 var relativeUrl = $"/Content/posts/{postFolderName}/assets/{fileName}";
+                 var relativeUrl = $"/Content/Posts/{postFolderName}/assets/{fileName}";
                  return Results.Ok(new { imageUrl = relativeUrl });
              });
              

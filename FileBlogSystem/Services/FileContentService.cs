@@ -23,10 +23,10 @@ namespace FileBlogSystem.Services
         {
             _contentRootPath = Path.Combine(env.ContentRootPath, "Content");
             _logger = logger;
-            _postsFolderPath = Path.Combine(_contentRootPath, "posts");
-            _categoriesFolderPath = Path.Combine(_contentRootPath, "categories");
-            _tagsFolderPath = Path.Combine(_contentRootPath, "tags");
-            _usersFolderPath = Path.Combine(_contentRootPath, "users");
+            _postsFolderPath = Path.Combine(_contentRootPath, "Posts");
+            _categoriesFolderPath = Path.Combine(_contentRootPath, "Categories");
+            _tagsFolderPath = Path.Combine(_contentRootPath, "Tags");
+            _usersFolderPath = Path.Combine(_contentRootPath, "Users");
             Directory.CreateDirectory(_postsFolderPath);
             Directory.CreateDirectory(_categoriesFolderPath);
             Directory.CreateDirectory(_tagsFolderPath);
@@ -67,7 +67,7 @@ namespace FileBlogSystem.Services
                 if (imageFiles.Any())
                 {
                     var fileName = Path.GetFileName(imageFiles.First());
-                    return $"/Content/users/{username.ToLowerInvariant()}/profilepicture/{fileName}";
+                    return $"/Content/Users/{username.ToLowerInvariant()}/profilepicture/{fileName}";
                 }
             }
             return null;
@@ -85,7 +85,7 @@ namespace FileBlogSystem.Services
         public async Task<List<BlogPostMetaResponse>> GetAllBlogPostsMetaAsync()
         {
             var postsMeta = new List<BlogPostMetaResponse>();
-            var postsDirectory = Path.Combine(_contentRootPath, "posts");
+            var postsDirectory = Path.Combine(_contentRootPath, "Posts");
             var now = DateTime.UtcNow;
             var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
 
@@ -275,12 +275,12 @@ namespace FileBlogSystem.Services
 
                 var datePrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
                 var postFolderName = $"{datePrefix}-{baseSlug}";
-                var postFolderPath = Path.Combine(_contentRootPath, "posts", postFolderName);
+                var postFolderPath = Path.Combine(_contentRootPath, "Posts", postFolderName);
 
                 if (Directory.Exists(postFolderPath))
                 {
                     postFolderName = $"{datePrefix}-{baseSlug}-{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
-                    postFolderPath = Path.Combine(_contentRootPath, "posts", postFolderName);
+                    postFolderPath = Path.Combine(_contentRootPath, "Posts", postFolderName);
                 }
 
                 Directory.CreateDirectory(postFolderPath);
@@ -308,7 +308,7 @@ namespace FileBlogSystem.Services
                     var imageFileName = await SaveBase64ImageAsync(postFolderPath, request.Base64Image);
                     if (imageFileName != null)
                     {
-                        newPostMeta.ImageUrl = $"/Content/posts/{postFolderName}/assets/{imageFileName}";
+                        newPostMeta.ImageUrl = $"/Content/Posts/{postFolderName}/assets/{imageFileName}";
                     }
                 }
 
@@ -400,7 +400,7 @@ namespace FileBlogSystem.Services
 
 
             var newPostFolderName = $"{datePrefix}-{newBaseSlug}";
-            var newPostFolderPath = Path.Combine(_contentRootPath, "posts", newPostFolderName);
+            var newPostFolderPath = Path.Combine(_contentRootPath, "Posts", newPostFolderName);
 
             if (existingPostMeta.PostFolderPath != newPostFolderPath)
             {
@@ -464,7 +464,7 @@ namespace FileBlogSystem.Services
                 var imageFileName = await SaveBase64ImageAsync(newPostFolderPath, request.Base64Image);
                 if (imageFileName != null)
                 {
-                    existingPostMeta.ImageUrl = $"/Content/posts/{newPostFolderName}/assets/{imageFileName}";
+                    existingPostMeta.ImageUrl = $"/Content/Posts/{newPostFolderName}/assets/{imageFileName}";
                 }
             }
             else if (request.ExplicitlyRemoveImage && existingPostMeta.ImageUrl != null)
