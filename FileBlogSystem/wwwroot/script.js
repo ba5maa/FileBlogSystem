@@ -1737,17 +1737,26 @@ async function loadPopularPosts() {
 
   function setupSearchAndFilter() {
     const searchInput = document.getElementById("search-input")
+    const searchContainer = document.querySelector(".search-container")
     const tagFilter = document.getElementById("tag-filter")
 
-    if (searchInput || tagFilter) {
-      searchInput.addEventListener(
-        "input",
-        debounce(() => {
+    if (searchInput) {
+      const searchIcon = searchContainer.querySelector(".fa-search")
+      searchIcon.style.cursor = "pointer"
+      searchIcon.addEventListener("click", () => {
           loadPosts()
-        }, 300),
-      )
+      })
+
+      searchInput.addEventListener("keypress", (e) => {
+          if (e.key === "Enter") {
+              loadPosts()
+          }
+      })
+    }
+
+    if (tagFilter) {
       tagFilter.addEventListener("change", () => {
-        loadPosts()
+          loadPosts()
       })
     }
   }
