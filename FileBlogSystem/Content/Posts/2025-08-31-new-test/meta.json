@@ -1,0 +1,22 @@
+{
+  "Id": "a4de6812-149f-4444-b29f-8aa7304627ae",
+  "Title": "new test",
+  "Description": "",
+  "CreationDate": "0001-01-01T00:00:00",
+  "PublishedDate": "2025-08-31T18:39:38.167Z",
+  "ModificationDate": "2025-08-31T18:39:38.1809275Z",
+  "Tags": [
+    "3b53d125-b543-4931-99bd-4d16d3a83fb6"
+  ],
+  "Categories": [
+    "84b73196-d5de-4896-8231-a540fb1e5b16"
+  ],
+  "CustomUrl": null,
+  "Slug": "new-test",
+  "isDraft": false,
+  "Content": "",
+  "ImageUrl": null,
+  "AuthorUsername": "admin",
+  "ScheduledFor": null,
+  "LikedByUsers": []
+}
