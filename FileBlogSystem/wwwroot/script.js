@@ -369,7 +369,7 @@ function convertMarkdownToHtml(markdownText) {
               <div class="blog-post-author">
                 <img src="${
                    post.authorProfilePictureUrl
-                     ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(post.authorProfilePictureUrl)}&width=80&height=80`
+                     ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(post.authorProfilePictureUrl.replace(/^\/content\//, ""))}&width=80&height=80`
                      : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=80&height=80`
                  }" class="author-avatar-large" alt="Author Avatar" />
                  
@@ -602,7 +602,7 @@ function convertMarkdownToHtml(markdownText) {
           <div class="comment-author">
             <img src="${
               comment.authorProfilePictureUrl
-                ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(comment.authorProfilePictureUrl)}&width=64&height=64`
+                ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(comment.authorProfilePictureUrl.replace(/^\/content\//, ""))}&width=64&height=64`
                 : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=64&height=64`
             }" class="avatar-img" alt="Avatar" />
             @${comment.username}
@@ -804,7 +804,7 @@ async function loadPopularPosts() {
         <div class="post-image-container">
           ${
             post.imageUrl
-              ? `<img src="${API_BASE_URL}/api/image?path=${encodeURIComponent(post.imageUrl)}&width=300&height=200" alt="${post.title}" />`
+              ? `<img src="${API_BASE_URL}/api/image?path=${encodeURIComponent(post.imageUrl.replace(/^\/content\//, ""))}&width=300&height=200" alt="${post.title}" />`
               : `<div class="post-image-placeholder">
                   <i class="fas fa-image"></i>
                 </div>`
@@ -827,7 +827,7 @@ async function loadPopularPosts() {
             <div class="author-info">
               <img src="${
                  post.authorProfilePictureUrl
-                   ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(post.authorProfilePictureUrl)}&width=64&height=64`
+                   ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(post.authorProfilePictureUrl.replace(/^\/content\//, ""))}&width=64&height=64`
                    : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=64&height=64`
                }" alt="Author Avatar" />
                
@@ -1737,17 +1737,26 @@ async function loadPopularPosts() {
 
   function setupSearchAndFilter() {
     const searchInput = document.getElementById("search-input")
+    const searchContainer = document.querySelector(".search-container")
     const tagFilter = document.getElementById("tag-filter")
 
-    if (searchInput || tagFilter) {
-      searchInput.addEventListener(
-        "input",
-        debounce(() => {
+    if (searchInput) {
+      const searchIcon = searchContainer.querySelector(".fa-search")
+      searchIcon.style.cursor = "pointer"
+      searchIcon.addEventListener("click", () => {
           loadPosts()
-        }, 300),
-      )
+      })
+
+      searchInput.addEventListener("keypress", (e) => {
+          if (e.key === "Enter") {
+              loadPosts()
+          }
+      })
+    }
+
+    if (tagFilter) {
       tagFilter.addEventListener("change", () => {
-        loadPosts()
+          loadPosts()
       })
     }
   }
@@ -1843,7 +1852,7 @@ async function loadPopularPosts() {
       <div class="post-image-container">
         ${
           post.imageUrl
-            ? `<img src="${API_BASE_URL}/api/image?path=${encodeURIComponent(post.imageUrl)}&width=300&height=200" alt="${post.title}" class="post-image">`
+            ? `<img src="${API_BASE_URL}/api/image?path=${encodeURIComponent(post.imageUrl.replace(/^\/content\//, ""))}&width=300&height=200" alt="${post.title}" class="post-image">`
             : '<div class="post-image-placeholder"><i class="fas fa-image"></i></div>'
         }
       </div>
@@ -1878,10 +1887,12 @@ async function loadPopularPosts() {
         
         <div class="post-card-footer">
           <div class="post-author-info">
-                <img src="${post.authorProfilePictureUrl 
-             ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(post.authorProfilePictureUrl)}&width=40&height=40`
+           <img src="${post.authorProfilePictureUrl 
+             ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(post.authorProfilePictureUrl.replace(/^\/content\//, ""))}&width=40&height=40`
              : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=40&height=40`}" 
-     class="post-author-avatar" alt="Author Avatar" />            <div class="post-author-details">
+     class="post-author-avatar" alt="Author Avatar" />
+
+            <div class="post-author-details">
               <span class="post-author-name">@${post.authorUsername}</span>
               <div class="post-date">${
                 post.isDraft && post.scheduledFor
@@ -3289,7 +3300,7 @@ async function loadPopularPosts() {
                    <button class="profile-btn" id="profile-btn">
                      <img src="${
                         user.profilePictureUrl
-                          ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(user.profilePictureUrl)}&width=64&height=64`
+                          ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(user.profilePictureUrl.replace(/^\/content\//, ""))}&width=64&height=64`
                           : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=64&height=64`
                       }" class="avatar-img" alt="Avatar" />
                       
@@ -3451,7 +3462,7 @@ async function loadPopularPosts() {
           <div class="user-avatar-section">
             <img src="${
                 user.profilePictureUrl
-                  ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(user.profilePictureUrl)}&width=48&height=48`
+                  ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(user.profilePictureUrl.replace(/^\/content\//, ""))}&width=48&height=48`
                   : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=48&height=48`
               }" 
               class="user-admin-avatar" alt="User Avatar" />

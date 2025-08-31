@@ -139,7 +139,7 @@ namespace FileBlogSystem.Services
         public async Task<BlogPostMetaResponse?> GetBlogPostMetaBySlugAsync(string slug)
         {
             var allPosts = await GetAllBlogPostsMetaAsync();
-            return allPosts.FirstOrDefault(p => p.Slug?.Equals(slug, StringComparison.OrdinalIgnoreCase) == true);
+            return allPosts.FirstOrDefault(p => p.Slug == slug);
         }
 
         public async Task<BlogPostMetaResponse?> GetBlogPostMetaByIdAsync(Guid id)
@@ -272,10 +272,15 @@ namespace FileBlogSystem.Services
                                ? GenerateSlug(request.CustomUrl)
                                : GenerateSlug(request.Title);
 
+                var postsDir = Path.Combine(_contentRootPath, "Posts");
+                if (!Directory.Exists(postsDir))
+                {
+                    Directory.CreateDirectory(postsDir);
+                }
 
                 var datePrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
                 var postFolderName = $"{datePrefix}-{baseSlug}";
-                var postFolderPath = Path.Combine(_contentRootPath, "Posts", postFolderName);
+                var postFolderPath = Path.Combine(postsDir, postFolderName);
 
                 if (Directory.Exists(postFolderPath))
                 {
@@ -365,8 +370,8 @@ namespace FileBlogSystem.Services
 
         private string GenerateSlug(string title)
         {
-            var slug = title.ToLowerInvariant();
-            slug = Regex.Replace(slug, @"[^a-z0-9\s-]", "");
+            var slug = title;
+            slug = Regex.Replace(slug, @"[^a-zA-Z0-9\s-]", "");
             slug = Regex.Replace(slug, @"\s+", "-").Trim();
             slug = Regex.Replace(slug, @"-+", "-");
             return slug;
@@ -398,11 +403,16 @@ namespace FileBlogSystem.Services
                 datePrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
             }
 
+            var postsDir = Path.Combine(_contentRootPath, "Posts");
+            if (!Directory.Exists(postsDir))
+            {
+                Directory.CreateDirectory(postsDir);
+            }
 
             var newPostFolderName = $"{datePrefix}-{newBaseSlug}";
-            var newPostFolderPath = Path.Combine(_contentRootPath, "Posts", newPostFolderName);
+            var newPostFolderPath = Path.Combine(postsDir, newPostFolderName);
 
-            if (existingPostMeta.PostFolderPath != newPostFolderPath)
+            if (!string.Equals(existingPostMeta.PostFolderPath, newPostFolderPath, StringComparison.Ordinal))
             {
                 try
                 {
