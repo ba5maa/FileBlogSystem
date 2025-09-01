@@ -2,4 +2,4 @@ replicaCount: 1
 image:
   repository: registry.arc-center.run/silverkeytech/fileblogsystem/ba5ma
   pullPolicy: IfNotPresent
-  tag: 765f65
+  tag: b80656
