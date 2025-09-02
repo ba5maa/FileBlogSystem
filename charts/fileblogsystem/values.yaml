@@ -62,6 +62,4 @@ volumeMounts: []
 nodeSelector: {}
 tolerations: []
 affinity: {}
-envFrom:
-  - secretRef:
-      name: fileblogsystem-mariambasma-dev
+
