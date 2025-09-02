@@ -2,4 +2,4 @@ replicaCount: 1
 image:
   repository: registry.arc-center.run/silverkeytech/fileblogsystem
   pullPolicy: IfNotPresent
-  tag: fileblogsystem-dev-latest
+  tag: 841dbb
