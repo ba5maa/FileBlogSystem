@@ -1,10 +1,10 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
-WORKDIR /app
-COPY . .
-RUN dotnet publish ./FileBlogSystem/FileBlogSystem.csproj -c Release -o out
+FROM python:3.10-alpine
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview
-WORKDIR /app
-COPY --from=build /app/out .
-EXPOSE 8080
-ENTRYPOINT ["dotnet", "FileBlogSystem.dll"]
+COPY requirements.txt /tmp
+
+RUN pip install -r /tmp/requirements.txt
+
+COPY ./src /src
+
+CMD python /src/app.py
+
