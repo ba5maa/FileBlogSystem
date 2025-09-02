@@ -1,5 +1,5 @@
 replicaCount: 1
 image:
-  repository: registry.arc-center.run/silverkeytech/fileblogsystem
+  repository: registry.arc-center.run/silverkeytech/fileblogsystem/mariam
   pullPolicy: IfNotPresent
-  tag: fileblogsystem-dev-latest
+  tag: f9359d
