@@ -2,4 +2,4 @@ replicaCount: 1
 image:
   repository: registry.arc-center.run/silverkeytech/fileblogsystem/mariambasma
   pullPolicy: IfNotPresent
-  tag: cd9599
+  tag: 16b1ed
