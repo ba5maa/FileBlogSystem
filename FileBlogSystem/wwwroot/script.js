@@ -1054,7 +1054,14 @@ async function loadPopularPosts() {
           body: JSON.stringify(credentials),
         })
 
-        const data = await response.json()
+        let data;
+        const responseText = await response.text();
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          console.error('Failed to parse response:', responseText);
+          throw new Error('Invalid server response');
+        }
 
         if (!response.ok) {
           console.error('Response not OK:', {
@@ -1129,18 +1136,30 @@ async function loadPopularPosts() {
           navigateTo("/feed")
         } else {
           try {
+            // Wait a short delay before attempting login after signup
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
             const loginResponse = await fetch(`${API_BASE_URL}/api/auth/login`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
+                "Accept": "application/json"
               },
+              credentials: "include",
               body: JSON.stringify({
                 username: credentials.username,
-                password: credentials.password,
+                password: credentials.password
               }),
             })
 
-            const loginData = await loginResponse.json()
+            let loginData;
+            const responseText = await loginResponse.text();
+            try {
+              loginData = JSON.parse(responseText);
+            } catch (e) {
+              console.error('Failed to parse login response:', responseText);
+              throw new Error('Invalid server response');
+            }
 
             if (loginResponse.ok) {
               try {
