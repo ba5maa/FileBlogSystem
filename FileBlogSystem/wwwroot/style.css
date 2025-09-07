@@ -64,7 +64,7 @@ header h1 i {
   font-size: 0.9rem;
   font-weight: 500;
   transition: all 0.3s ease;
-  color: #667eea;
+  color: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .nav-btn:hover {
@@ -73,7 +73,7 @@ header h1 i {
 }
 
 .nav-btn.active {
-  background: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
 }
 
@@ -462,7 +462,7 @@ header h1 i {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  background: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   padding: 0.25rem 0.75rem;
   border-radius: 20px;
@@ -674,7 +674,7 @@ header h1 i {
 
 .post-tag {
   background: #f8f9fa;
-  color: #6c757d;
+  color: #495057;
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
   font-size: 0.75rem;
@@ -1172,22 +1172,22 @@ header h1 i {
 }
 
 .btn-primary {
-  background: #667eea;
+  background: #764ba2;
   color: white;
 }
 
 .btn-primary:hover {
-  background: #5a6fd8;
+  background: #5d3b7e;
   transform: translateY(-1px);
 }
 
 .btn-success {
-  background: #28a745;
+  background: #218839;
   color: white;
 }
 
 .btn-success:hover {
-  background: #218838;
+  background: #195626;
 }
 
 .btn-danger {
@@ -1196,7 +1196,7 @@ header h1 i {
 }
 
 .btn-danger:hover {
-  background: #c82333;
+  background: #890d19;
 }
 
 .btn-outline {
@@ -1485,7 +1485,7 @@ footer {
 }
 
 .role-badge.author {
-  background: #28a745;
+  background: #218839;
   color: white;
 }
 
@@ -2218,12 +2218,12 @@ footer {
 
 .admin-nav-btn:hover {
   background: rgba(102, 126, 234, 0.1);
-  border-color: #667eea;
-  color: #667eea;
+  border-color: transparent;
+  color: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .admin-nav-btn.active {
-  background: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-color: #667eea;
 }
@@ -2680,7 +2680,7 @@ footer {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  background: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   padding: 0.25rem 0.75rem;
   border-radius: 20px;

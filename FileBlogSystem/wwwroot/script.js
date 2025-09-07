@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const appContainer = document.getElementById("app-container")
   const mainNav = document.getElementById("main-nav")
 
-  const API_BASE_URL =  window.location.hostname === "localhost"? "http://localhost:5211" : window.location.origin
+  const API_BASE_URL = window.location.hostname === "localhost" ? "http://localhost:5211" : window.location.protocol + '//' + window.location.host
 
   let user = null
   let token = null
@@ -367,13 +367,11 @@ function convertMarkdownToHtml(markdownText) {
             
             <div class="blog-post-meta">
               <div class="blog-post-author">
-                <img src="${
-                   post.authorProfilePictureUrl
-                     ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(post.authorProfilePictureUrl.replace(/^\/content\//, ""))}&width=80&height=80`
-                     : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=80&height=80`
-                 }" class="author-avatar-large" alt="Author Avatar" />
-                 
-                <div class="author-info">
+                   <img src="${
+                     post.authorProfilePictureUrl
+                       ? API_BASE_URL + '/api/image?path=' + encodeURIComponent(post.authorProfilePictureUrl.replace(/^\/content\//, "")) + '&width=80&height=80'
+                       : API_BASE_URL + '/api/image?path=static/avatar.jpg&width=80&height=80'
+                   }" class="author-avatar-large" alt="${post.authorUsername} Avatar" />                <div class="author-info">
                   <span class="author-name">@${post.authorUsername}</span>
                   <span class="publish-date">${formatDate(post.publishedDate || post.creationDate)}</span>
                 </div>
@@ -602,8 +600,8 @@ function convertMarkdownToHtml(markdownText) {
           <div class="comment-author">
             <img src="${
               comment.authorProfilePictureUrl
-                ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(comment.authorProfilePictureUrl.replace(/^\/content\//, ""))}&width=64&height=64`
-                : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=64&height=64`
+                ? API_BASE_URL + '/api/image?path=' + encodeURIComponent(comment.authorProfilePictureUrl.replace(/^\/content\//, "")) + '&width=64&height=64'
+                : API_BASE_URL + '/api/image?path=static/avatar.jpg&width=64&height=64'
             }" class="avatar-img" alt="Avatar" />
             @${comment.username}
           </div>
@@ -687,7 +685,7 @@ async function renderWelcomePage() {
           <div>
             <i class="fas fa-pen-fancy"></i>
           </div>
-          <h3>Write & Share</h3>
+          <h1>Write & Share</h1>
           <p>Express your thoughts and share your stories with our intuitive writing tools and markdown support.</p>
         </div>
         
@@ -695,7 +693,7 @@ async function renderWelcomePage() {
           <div>
             <i class="fas fa-users"></i>
           </div>
-          <h3>Connect</h3>
+          <h1>Connect</h1>
           <p>Join a vibrant community of writers and readers. Like, comment, and engage with amazing content.</p>
         </div>
         
@@ -703,7 +701,7 @@ async function renderWelcomePage() {
           <div>
             <i class="fas fa-heart"></i>
           </div>
-          <h3>Discover</h3>
+          <h1>Discover</h1>
           <p>Explore trending topics, discover new authors, and find content that inspires and educates.</p>
         </div>
       </div>
@@ -804,7 +802,7 @@ async function loadPopularPosts() {
         <div class="post-image-container">
           ${
             post.imageUrl
-              ? `<img src="${API_BASE_URL}/api/image?path=${encodeURIComponent(post.imageUrl.replace(/^\/content\//, ""))}&width=300&height=200" alt="${post.title}" />`
+              ? `<img src="${API_BASE_URL}/api/image?path=` + encodeURIComponent(post.imageUrl.replace(/^\/content\//, "")) + '&width=300&height=200" alt="' + post.title + '" />'
               : `<div class="post-image-placeholder">
                   <i class="fas fa-image"></i>
                 </div>`
@@ -829,8 +827,8 @@ async function loadPopularPosts() {
                  post.authorProfilePictureUrl
                    ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(post.authorProfilePictureUrl.replace(/^\/content\//, ""))}&width=64&height=64`
                    : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=64&height=64`
-               }" alt="Author Avatar" />
-               
+               }" alt="${post.authorUsername} Avatar" />
+
               <div>
                 <div class="author-username">@${post.authorUsername}</div>
                 <div class="post-date">${formatDate(post.publishedDate || post.creationDate)}</div>
@@ -1176,10 +1174,10 @@ async function loadPopularPosts() {
                 <div class="search-section">
                     <div class="search-container">
                         <i class="fas fa-search"></i>
-                        <input type="text" id="search-input" placeholder="Search...">
+                        <input type="text" id="search-input" placeholder="Search..." aria-label="Search">
                     </div>
                     <div class="filter-container">
-                        <select id="tag-filter">
+                        <select id="tag-filter" aria-label="Filter by Tag">
                             <option value="">All Tags</option>
                             ${TAGS.map((tag) => `<option value="${tag.id}">${getTagNameById(tag.id)}</option>`).join("")}
                         </select>
@@ -1890,7 +1888,7 @@ async function loadPopularPosts() {
            <img src="${post.authorProfilePictureUrl 
              ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(post.authorProfilePictureUrl.replace(/^\/content\//, ""))}&width=40&height=40`
              : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=40&height=40`}" 
-     class="post-author-avatar" alt="Author Avatar" />
+     class="post-author-avatar" alt="${post.authorUsername} Avatar" />
 
             <div class="post-author-details">
               <span class="post-author-name">@${post.authorUsername}</span>
@@ -2409,8 +2407,8 @@ async function loadPopularPosts() {
               <input type="file" id="edit-post-image" accept="image/*">
               ${
                 postData.imageUrl
-                  ? `<img src="${API_BASE_URL}${postData.imageUrl}" alt="${postData.title || "Current Image"}" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px;">
-                   <button type="button" class="btn btn-sm btn-danger remove-image-btn" style="margin-top: 5px;">Remove Image</button>`
+                  ? '<img src="' + API_BASE_URL + postData.imageUrl + '" alt="' + (postData.title || "Current Image") + '" class="post-image-preview" style="max-width: 150px; margin-top: 10px; border-radius: 8px;">' +
+                    '<button type="button" class="btn btn-sm btn-danger remove-image-btn" style="margin-top: 5px;">Remove Image</button>'
                   : ""
               }
             </div>
@@ -2897,8 +2895,8 @@ async function loadPopularPosts() {
               <div class="profile-avatar">
                 <img src="${
                   user.profilePictureUrl
-                    ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(user.profilePictureUrl.replace(/^\/content\//, ""))}&width=120&height=120`
-                    : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=120&height=120`
+                    ? API_BASE_URL + '/api/image?path=' + encodeURIComponent(user.profilePictureUrl.replace(/^\/content\//, "")) + '&width=120&height=120'
+                    : API_BASE_URL + '/api/image?path=static/avatar.jpg&width=120&height=120'
                 }" 
                 class="profile-avatar-large" alt="Profile Avatar" />
                 
@@ -3300,8 +3298,8 @@ async function loadPopularPosts() {
                    <button class="profile-btn" id="profile-btn">
                      <img src="${
                         user.profilePictureUrl
-                          ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(user.profilePictureUrl.replace(/^\/content\//, ""))}&width=64&height=64`
-                          : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=64&height=64`
+                          ? API_BASE_URL + '/api/image?path=' + encodeURIComponent(user.profilePictureUrl.replace(/^\/content\//, "")) + '&width=64&height=64'
+                          : API_BASE_URL + '/api/image?path=static/avatar.jpg&width=64&height=64'
                       }" class="avatar-img" alt="Avatar" />
                       
                      <span style="color: #1a1a1a;">${user.username}</span>
