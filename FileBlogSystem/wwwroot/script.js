@@ -990,7 +990,7 @@ async function loadPopularPosts() {
       const credentials = {
         username: usernameInput.value.trim(),
         password: passwordInput.value,
-        roles: ["Author"],
+        roles: ["Author"] // This will be removed for login requests
       }
 
       if (currentType === "login") {
@@ -1034,11 +1034,16 @@ async function loadPopularPosts() {
       let endpoint = ""
       if (currentType === "login") {
         endpoint = `${API_BASE_URL}/api/auth/login`
+        // Remove roles for login request
+        delete credentials.roles;
       } else {
         endpoint = `${API_BASE_URL}/api/user`
       }
 
       try {
+        console.log('Sending request to:', endpoint);
+        console.log('With credentials:', { ...credentials, password: '[REDACTED]' });
+        
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
@@ -1052,9 +1057,15 @@ async function loadPopularPosts() {
         const data = await response.json()
 
         if (!response.ok) {
+          console.error('Response not OK:', {
+            status: response.status,
+            statusText: response.statusText,
+            data: data
+          });
+          
           if (response.status === 401 && currentType === "login") {
             console.error("Login error response:", data);
-            const errorMessage = data.message || "Invalid username or password";
+            const errorMessage = data.message || data.error || data.detail || "Invalid username or password";
             showFieldError("username", errorMessage);
             showFieldError("password", errorMessage);
             showMessage(errorMessage + ". Please check your credentials and try again.", "error", messageElement);
