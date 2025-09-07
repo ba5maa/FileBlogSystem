@@ -171,7 +171,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const headers = {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      "Accept": "application/json",
+      "Authorization": `Bearer ${token}`,
       ...(options.headers || {}),
     }
 
@@ -1042,7 +1043,9 @@ async function loadPopularPosts() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Accept": "application/json"
           },
+          credentials: "include",
           body: JSON.stringify(credentials),
         })
 
@@ -1050,9 +1053,11 @@ async function loadPopularPosts() {
 
         if (!response.ok) {
           if (response.status === 401 && currentType === "login") {
-            showFieldError("username", "Invalid username or password")
-            showFieldError("password", "Invalid username or password")
-            showMessage("Please check your credentials and try again.", "error", messageElement)
+            console.error("Login error response:", data);
+            const errorMessage = data.message || "Invalid username or password";
+            showFieldError("username", errorMessage);
+            showFieldError("password", errorMessage);
+            showMessage(errorMessage + ". Please check your credentials and try again.", "error", messageElement);
           } else if (response.status === 409 && currentType === "signup") {
             showFieldError("username", "This username is already taken")
             showMessage("Please choose a different username.", "error", messageElement)
@@ -1078,7 +1083,12 @@ async function loadPopularPosts() {
         if (currentType === "login") {
           try {
             const userResponse = await fetch(`${API_BASE_URL}/api/user/${data.user.username}`, {
-              headers: { Authorization: `Bearer ${data.token}` },
+              headers: { 
+                "Authorization": `Bearer ${data.token}`,
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+              },
+              credentials: "include"
             })
             if (userResponse.ok) {
                const fullUserData = await userResponse.json()
