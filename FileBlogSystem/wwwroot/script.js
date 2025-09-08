@@ -480,7 +480,7 @@ function convertMarkdownToHtml(markdownText) {
           isAuthenticated()
             ? `
             <div class="comment-form">
-              <textarea class="comment-input" placeholder="Write a comment..." data-post-slug="${slug}"></textarea>
+              <textarea class="comment-input" placeholder="Write a comment..." data-post-slug="${slug}" aria-label="Write a comment..."></textarea>
               <button class="comment-submit-btn" data-post-slug="${slug}">
                 <i class="fas fa-paper-plane"></i>
                 Post Comment
@@ -3503,8 +3503,8 @@ async function loadPopularPosts() {
                   ? `${API_BASE_URL}/api/image?path=${encodeURIComponent(user.profilePictureUrl.replace(/^\/content\//, ""))}&width=48&height=48`
                   : `${API_BASE_URL}/api/image?path=static/avatar.jpg&width=48&height=48`
               }" 
-              class="user-admin-avatar" alt="User Avatar" />
-              
+              class="user-admin-avatar" alt="${user.username} Avatar" />
+
             <div class="user-basic-info">
               <h4 class="user-admin-name">@${user.username}</h4>
               <p class="user-admin-email">${user.email}</p>
