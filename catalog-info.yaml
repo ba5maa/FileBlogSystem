@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: fileblogsystem
+  description: Python app that displays time. Named fileblogsystem
+  annotations:
+    github.com/project-slug: silverkeytech/fileblogsystem
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  owner: development
+  lifecycle: experimental
