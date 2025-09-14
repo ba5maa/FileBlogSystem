@@ -1,5 +1,5 @@
 replicaCount: 1
 image:
-  repository: registry.arc-center.run/silverkeytech/fileblogsystem
+  repository: registry.arc-center.run/silverkeytech/fileblogsystem/basmanew
   pullPolicy: IfNotPresent
-  tag: fileblogsystem-dev-latest
+  tag: 03e002
