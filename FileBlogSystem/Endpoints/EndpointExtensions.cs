@@ -223,14 +223,14 @@ namespace FileBlogSystem.Endpoints
                 var user = await contentService.GetUserByUsernameAsync(request.Username);
                 if (user == null)
                 {
-                    return Results.Json(new { message = string.Format(EndpointConstants.InvalidUsernameOrPassword), Username = request.Username, Password = request.Password }, statusCode: 401);
+                    return Results.Json(new { message = string.Format(EndpointConstants.InvalidUsernameOrPassword), Username = request.Username, Password = request.Password, user = user }, statusCode: 401);
                 }
 
                 Console.WriteLine($"User found: {user.Username}. Stored hash: {user.HashedPassword}");
 
                 if (!PasswordHasher.VerifyPassword(request.Password, user.HashedPassword))
                 {
-                    return Results.Json(new { message = string.Format(EndpointConstants.InvalidUsernameOrPassword), Username = request.Username, Password = request.Password }, statusCode: 401);
+                    return Results.Json(new { message = string.Format(EndpointConstants.InvalidUsernameOrPassword), Username = request.Username, Password = request.Password, hashedPassword = user.HashedPassword }, statusCode: 401);
                 }
 
                 Console.WriteLine($"Login successful for user: {user.Username}. Generating token...");
