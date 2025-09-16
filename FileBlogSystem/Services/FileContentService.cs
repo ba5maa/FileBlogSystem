@@ -244,7 +244,7 @@ namespace FileBlogSystem.Services
         {
             try
             {
-                var userDir = Path.Combine(_usersFolderPath, username.Trim().ToLowerInvariant());
+                var userDir = Path.Combine(_usersFolderPath, username.Trim());
                 var profileFilePath = Path.Combine(userDir, "profile.json");
 
                 if (File.Exists(profileFilePath))

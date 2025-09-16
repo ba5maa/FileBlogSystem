@@ -241,7 +241,8 @@ namespace FileBlogSystem.Endpoints
 
                 if (string.IsNullOrEmpty(jwtSecret) || string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(audience))
                 {
-                    return Results.StatusCode(StatusCodes.Status500InternalServerError);
+                    //return Results.StatusCode(StatusCodes.Status500InternalServerError);
+                    return Results.Json(new { message = "internal server error", jwtSecret = jwtSecret, issuer = issuer, audience = audience , user = user}, statusCode: 500);
                 }
 
                 var claims = new List<Claim>
